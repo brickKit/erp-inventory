@@ -149,13 +149,13 @@ func TestAdjust_负数是合法输入(t *testing.T) {
 	}
 }
 
-func TestGetReservationStatus_reservationId为空时拒绝(t *testing.T) {
+func TestGetReservationStatus_两个都为空时拒绝(t *testing.T) {
 	svc, _, _ := newTestService(t)
 	ctx := context.Background()
 
-	_, _, err := svc.GetReservationStatus(ctx, "")
+	_, _, err := svc.GetReservationStatus(ctx, "", "")
 	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("reservation_id 为空应该拒绝，实际：%v", err)
+		t.Fatalf("reservation_id 与 idempotency_key 都为空应该拒绝，实际：%v", err)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestGetReservationStatus_查不到不是错误(t *testing.T) {
 	svc, _, _ := newTestService(t)
 	ctx := context.Background()
 
-	status, _, err := svc.GetReservationStatus(ctx, "999999999999")
+	status, _, err := svc.GetReservationStatus(ctx, "999999999999", "")
 	if err != nil {
 		t.Fatalf("查一个不存在的 reservation_id 不该报错：%v", err)
 	}

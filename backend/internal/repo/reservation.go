@@ -5,6 +5,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -351,9 +352,29 @@ func decodeConfirmResult(raw string) (status string, movementIDs []string) {
 
 // GetReservationStatus 是防"薛定谔的超时"的唯一手段（设计计划 §4.5）：
 // 上游 Reserve 超时后必须先查这个接口，严禁直接调 Cancel。
-func (r *Repo) GetReservationStatus(ctx context.Context, reservationID string) (status, orderID string, err error) {
+//
+// ⚠️ reservationID 为空、idempotencyKey 非空时走 by-idempotency-key 分支
+// （设计计划 §9：Reserve 本身超时——响应没收到，不代表请求没处理——时
+// 调用方根本不知道 reservation_id，这恰恰是最需要查状态的场景）。
+// command_idempotency 里 idempotency_key → reservation_id 的映射只在
+// Reserve 事务**提交后**才对其他事务可见（READ COMMITTED），所以"查到
+// 映射"与"Reserve 已提交"完全等价；查不到就是真正的 NOT_FOUND，调用方
+// 可以安全地带着同一个 idempotency_key 重试 Reserve——claim-first 幂等
+// 保证不会产生重复预留。
+func (r *Repo) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID string, err error) {
 	err = besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
-		_, current, oid, err := loadReservationGroup(ctx, tx, reservationID, false)
+		effectiveID := reservationID
+		if effectiveID == "" {
+			resolved, err := lookupIdempotencyResult(ctx, tx, idempotencyKey)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil // 真正的 NOT_FOUND：status/orderID 留零值
+			}
+			if err != nil {
+				return err
+			}
+			effectiveID = resolved
+		}
+		_, current, oid, err := loadReservationGroup(ctx, tx, effectiveID, false)
 		status, orderID = current, oid
 		return err
 	})

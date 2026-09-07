@@ -337,7 +337,7 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	east := warehouseID(t, db, "WH-EAST")
 	pid := uniqueProductID("status")
 
-	status, _, err := r.GetReservationStatus(ctx, "999999999")
+	status, _, err := r.GetReservationStatus(ctx, "999999999", "")
 	if err != nil {
 		t.Fatalf("查一个从没出现过的 reservation_id 不该报错：%v", err)
 	}
@@ -361,7 +361,7 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	status, orderID, err := r.GetReservationStatus(ctx, rid)
+	status, orderID, err := r.GetReservationStatus(ctx, rid, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,6 +370,65 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	}
 	if orderID != "order-6" {
 		t.Fatalf("期望 order_id=order-6，实际 %q", orderID)
+	}
+}
+
+// TestGetReservationStatus_按idempotencyKey查 是设计计划 §9 那条新增
+// 契约字段的直接测试：Reserve 本身超时时调用方拿不到 reservation_id，
+// 只能带着当初发的 idempotency_key 查——这条测试验证这条路径查到的
+// 结果与按 reservation_id 查完全一致，且查一个从没提交过的
+// idempotency_key 会得到真正的 NOT_FOUND（不是报错）。
+func TestGetReservationStatus_按idempotencyKey查(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	r := New(db, "erp_inventory_rw", "erp_inventory")
+	east := warehouseID(t, db, "WH-EAST")
+	pid := uniqueProductID("status-idem")
+	idemKey := "test-reserve-idem-" + pid
+
+	if _, err := r.Receive(ctx, ReceiveInput{
+		IdempotencyKey: "test-recv-idem-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		t.Fatal(err)
+	}
+	rid, err := r.Reserve(ctx, ReserveInput{
+		IdempotencyKey: idemKey, OrderID: "order-idem-1",
+		Items: []ReserveItem{{ProductID: pid, WarehouseID: east, Qty: "3"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 空 reservation_id + 真实 idempotency_key：必须解析出同一个 reservation_id，
+	// 状态与直接按 reservation_id 查完全一致。
+	statusByKey, orderIDByKey, err := r.GetReservationStatus(ctx, "", idemKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusByKey != StatusReserved {
+		t.Fatalf("按 idempotency_key 查期望 RESERVED，实际 %q", statusByKey)
+	}
+	if orderIDByKey != "order-idem-1" {
+		t.Fatalf("期望 order_id=order-idem-1，实际 %q", orderIDByKey)
+	}
+
+	// 交叉验证：按 reservation_id 查到的状态与按 idempotency_key 查到的一致
+	// ——两条路径必须指向同一行，不会出现"按 id 查是 A、按 key 查是 B"。
+	statusByID, orderIDByID, err := r.GetReservationStatus(ctx, rid, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusByID != statusByKey || orderIDByID != orderIDByKey {
+		t.Fatalf("两条路径结果不一致：按id=(%q,%q) 按key=(%q,%q)",
+			statusByID, orderIDByID, statusByKey, orderIDByKey)
+	}
+
+	// 从没提交过的 idempotency_key：真正的 NOT_FOUND，不报错。
+	status, orderID, err := r.GetReservationStatus(ctx, "", "从未出现过的-idempotency-key-"+pid)
+	if err != nil {
+		t.Fatalf("查一个从没提交过的 idempotency_key 不该报错：%v", err)
+	}
+	if status != StatusUnspecified || orderID != "" {
+		t.Fatalf("期望 NOT_FOUND，实际 status=%q order_id=%q", status, orderID)
 	}
 }
 

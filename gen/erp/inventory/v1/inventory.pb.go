@@ -521,10 +521,27 @@ func (x *ConfirmIssueResponse) GetMovementIds() []string {
 }
 
 type GetReservationStatusRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ReservationId string                 `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 二选一：正常情况下调用方（如 erp-sales）手里有 Reserve 成功返回的
+	// reservation_id，直接查。⚠️ 但 Reserve 本身超时（响应没收到，不代表
+	// 请求没处理）时调用方根本不知道 reservation_id——这种情况下用
+	// idempotency_key（Reserve 请求里发的那个）查：本组件的 Reserve 走
+	// claim-first 幂等，command_idempotency 表里 idempotency_key →
+	// reservation_id 的映射只在 Reserve 事务**提交后**才对其他事务可见，
+	// 所以"按 idempotency_key 查到" 与 "Reserve 已提交" 完全等价；查不到
+	// 就是真正的 NOT_FOUND（提交尚未发生或从未发生），可以安全重试 Reserve
+	// ——claim-first 保证重试不会产生重复预留。reservation_id 非空时优先
+	// 用 reservation_id（v1.0.0 起就有的路径不变）；为空时才退回
+	// idempotency_key。两个都为空是入参错误。
+	//
+	// 这个字段是本阶段 Task 17（erp-sales 第一次真实实现 TCC 补偿链）时
+	// 发现的契约缺口：v1.0.0 只支持按 reservation_id 查，但"Reserve 超时"
+	// 这个最需要查状态的场景恰恰是调用方唯一拿不到 reservation_id 的场景。
+	// 详见 docs/design/erp-inventory.md §9、docs/design/erp-sales.md §9。
+	ReservationId  string `protobuf:"bytes,1,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
+	IdempotencyKey string `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetReservationStatusRequest) Reset() {
@@ -560,6 +577,13 @@ func (*GetReservationStatusRequest) Descriptor() ([]byte, []int) {
 func (x *GetReservationStatusRequest) GetReservationId() string {
 	if x != nil {
 		return x.ReservationId
+	}
+	return ""
+}
+
+func (x *GetReservationStatusRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -1419,9 +1443,10 @@ const file_erp_inventory_v1_inventory_proto_rawDesc = "" +
 	"\tserial_no\x18\x04 \x01(\tR\bserialNo\"v\n" +
 	"\x14ConfirmIssueResponse\x12;\n" +
 	"\x06status\x18\x01 \x01(\x0e2#.erp.inventory.v1.ReservationStatusR\x06status\x12!\n" +
-	"\fmovement_ids\x18\x02 \x03(\tR\vmovementIds\"D\n" +
+	"\fmovement_ids\x18\x02 \x03(\tR\vmovementIds\"m\n" +
 	"\x1bGetReservationStatusRequest\x12%\n" +
-	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\"v\n" +
+	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"v\n" +
 	"\x1cGetReservationStatusResponse\x12;\n" +
 	"\x06status\x18\x01 \x01(\x0e2#.erp.inventory.v1.ReservationStatusR\x06status\x12\x19\n" +
 	"\border_id\x18\x02 \x01(\tR\aorderId\"\xc5\x01\n" +

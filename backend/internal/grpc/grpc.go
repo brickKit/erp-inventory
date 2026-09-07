@@ -76,7 +76,7 @@ func (s *server) ConfirmIssue(ctx context.Context, req *inventoryv1.ConfirmIssue
 }
 
 func (s *server) GetReservationStatus(ctx context.Context, req *inventoryv1.GetReservationStatusRequest) (*inventoryv1.GetReservationStatusResponse, error) {
-	status, orderID, err := s.svc.GetReservationStatus(ctx, req.ReservationId)
+	status, orderID, err := s.svc.GetReservationStatus(ctx, req.ReservationId, req.IdempotencyKey)
 	if err != nil {
 		return nil, service.ToStatus(err)
 	}

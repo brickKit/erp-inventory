@@ -103,11 +103,15 @@ func (s *Service) ConfirmIssue(ctx context.Context, in repo.ConfirmIssueInput) (
 
 // GetReservationStatus 是防"薛定谔的超时"的唯一手段——查不到（NOT_FOUND）
 // 不是错误，是这个接口存在的意义本身（设计计划 §4.5），不在这里拦截。
-func (s *Service) GetReservationStatus(ctx context.Context, reservationID string) (status, orderID string, err error) {
-	if reservationID == "" {
-		return "", "", fmt.Errorf("%w: reservation_id 不能为空", ErrInvalidArgument)
+//
+// ⚠️ reservationID/idempotencyKey 二选一（设计计划 §9）：Reserve 本身
+// 超时时调用方拿不到 reservation_id，只能带着当初发的 idempotency_key
+// 来查。两个都不给才是入参错误。
+func (s *Service) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID string, err error) {
+	if reservationID == "" && idempotencyKey == "" {
+		return "", "", fmt.Errorf("%w: reservation_id 与 idempotency_key 不能同时为空", ErrInvalidArgument)
 	}
-	return s.repo.GetReservationStatus(ctx, reservationID)
+	return s.repo.GetReservationStatus(ctx, reservationID, idempotencyKey)
 }
 
 // ── 命令：入库 / 调整 ──
