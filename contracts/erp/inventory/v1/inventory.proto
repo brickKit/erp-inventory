@@ -120,6 +120,14 @@ message GetReservationStatusResponse {
   // （不能重试）必须能区分，绝不许合并成一个"没有"（设计计划 §3、§4.5）。
   ReservationStatus status = 1;
   string order_id          = 2;
+  // ⚠️ 与 idempotency_key 字段同批追加（设计计划 §9 第 9 条）：调用方按
+  // idempotency_key 查到 RESERVED 后，必须把**真正的** reservation_id
+  // 存下来（后续 CancelOrder/ShipOrder 要用它调 CancelReservation/
+  // ConfirmIssue）——v1.0.1 只加了 GetReservationStatusRequest 的
+  // idempotency_key 字段，却忘了让 Response 把解析出来的 reservation_id
+  // 带回去，调用方查到状态却还是拿不到 id，等于没解决问题。空字符串表示
+  // NOT_FOUND（与 status 的 UNSPECIFIED 同一个语义）。
+  string reservation_id    = 3;
 }
 
 message ReceiveRequest {

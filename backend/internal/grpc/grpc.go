@@ -76,11 +76,13 @@ func (s *server) ConfirmIssue(ctx context.Context, req *inventoryv1.ConfirmIssue
 }
 
 func (s *server) GetReservationStatus(ctx context.Context, req *inventoryv1.GetReservationStatusRequest) (*inventoryv1.GetReservationStatusResponse, error) {
-	status, orderID, err := s.svc.GetReservationStatus(ctx, req.ReservationId, req.IdempotencyKey)
+	status, orderID, reservationID, err := s.svc.GetReservationStatus(ctx, req.ReservationId, req.IdempotencyKey)
 	if err != nil {
 		return nil, service.ToStatus(err)
 	}
-	return &inventoryv1.GetReservationStatusResponse{Status: toProtoStatus(status), OrderId: orderID}, nil
+	return &inventoryv1.GetReservationStatusResponse{
+		Status: toProtoStatus(status), OrderId: orderID, ReservationId: reservationID,
+	}, nil
 }
 
 func (s *server) Receive(ctx context.Context, req *inventoryv1.ReceiveRequest) (*inventoryv1.ReceiveResponse, error) {

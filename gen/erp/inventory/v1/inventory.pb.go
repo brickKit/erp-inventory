@@ -593,8 +593,16 @@ type GetReservationStatusResponse struct {
 	// ⚠️ RESERVATION_STATUS_UNSPECIFIED 在这里就是 NOT_FOUND 的信号——
 	// "请求根本没到"（可以安全重试），与 CANCELLED"到了且已撤销"
 	// （不能重试）必须能区分，绝不许合并成一个"没有"（设计计划 §3、§4.5）。
-	Status        ReservationStatus `protobuf:"varint,1,opt,name=status,proto3,enum=erp.inventory.v1.ReservationStatus" json:"status,omitempty"`
-	OrderId       string            `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Status  ReservationStatus `protobuf:"varint,1,opt,name=status,proto3,enum=erp.inventory.v1.ReservationStatus" json:"status,omitempty"`
+	OrderId string            `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	// ⚠️ 与 idempotency_key 字段同批追加（设计计划 §9 第 9 条）：调用方按
+	// idempotency_key 查到 RESERVED 后，必须把**真正的** reservation_id
+	// 存下来（后续 CancelOrder/ShipOrder 要用它调 CancelReservation/
+	// ConfirmIssue）——v1.0.1 只加了 GetReservationStatusRequest 的
+	// idempotency_key 字段，却忘了让 Response 把解析出来的 reservation_id
+	// 带回去，调用方查到状态却还是拿不到 id，等于没解决问题。空字符串表示
+	// NOT_FOUND（与 status 的 UNSPECIFIED 同一个语义）。
+	ReservationId string `protobuf:"bytes,3,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -639,6 +647,13 @@ func (x *GetReservationStatusResponse) GetStatus() ReservationStatus {
 func (x *GetReservationStatusResponse) GetOrderId() string {
 	if x != nil {
 		return x.OrderId
+	}
+	return ""
+}
+
+func (x *GetReservationStatusResponse) GetReservationId() string {
+	if x != nil {
+		return x.ReservationId
 	}
 	return ""
 }
@@ -1446,10 +1461,11 @@ const file_erp_inventory_v1_inventory_proto_rawDesc = "" +
 	"\fmovement_ids\x18\x02 \x03(\tR\vmovementIds\"m\n" +
 	"\x1bGetReservationStatusRequest\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\x12'\n" +
-	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"v\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\"\x9d\x01\n" +
 	"\x1cGetReservationStatusResponse\x12;\n" +
 	"\x06status\x18\x01 \x01(\x0e2#.erp.inventory.v1.ReservationStatusR\x06status\x12\x19\n" +
-	"\border_id\x18\x02 \x01(\tR\aorderId\"\xc5\x01\n" +
+	"\border_id\x18\x02 \x01(\tR\aorderId\x12%\n" +
+	"\x0ereservation_id\x18\x03 \x01(\tR\rreservationId\"\xc5\x01\n" +
 	"\x0eReceiveRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +

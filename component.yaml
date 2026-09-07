@@ -4,7 +4,7 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.1                     # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.2                     # 精确版本，不接受 ^ / ~ / latest
   description: 库存余额、流水、预留、防超卖判定——物理命令枢纽
   license: Apache-2.0
   vendor: brickKit
@@ -50,7 +50,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.1
+  image: brickenterprise/erp-inventory:1.0.2
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）

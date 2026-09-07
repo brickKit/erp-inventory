@@ -361,13 +361,18 @@ func decodeConfirmResult(raw string) (status string, movementIDs []string) {
 // 映射"与"Reserve 已提交"完全等价；查不到就是真正的 NOT_FOUND，调用方
 // 可以安全地带着同一个 idempotency_key 重试 Reserve——claim-first 幂等
 // 保证不会产生重复预留。
-func (r *Repo) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID string, err error) {
+// ⚠️ 返回值多了 reservationID（设计计划 §9 第 9 条追加）：调用方按
+// idempotencyKey 查到 RESERVED 后必须把**真正的** reservation_id 存下来
+// （后续 CancelOrder/ShipOrder 要用它调 CancelReservation/ConfirmIssue）
+// ——只告诉状态、不告诉 id，调用方查到了也还是没法用。reservationID 非空
+// 入参时原样回传，走 idempotencyKey 分支时回传解析出来的那个。
+func (r *Repo) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID, resolvedReservationID string, err error) {
 	err = besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
 		effectiveID := reservationID
 		if effectiveID == "" {
 			resolved, err := lookupIdempotencyResult(ctx, tx, idempotencyKey)
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil // 真正的 NOT_FOUND：status/orderID 留零值
+				return nil // 真正的 NOT_FOUND：所有返回值留零值
 			}
 			if err != nil {
 				return err
@@ -375,8 +380,14 @@ func (r *Repo) GetReservationStatus(ctx context.Context, reservationID, idempote
 			effectiveID = resolved
 		}
 		_, current, oid, err := loadReservationGroup(ctx, tx, effectiveID, false)
+		if err != nil {
+			return err
+		}
 		status, orderID = current, oid
-		return err
+		if current != StatusUnspecified {
+			resolvedReservationID = effectiveID
+		}
+		return nil
 	})
-	return status, orderID, err
+	return status, orderID, resolvedReservationID, err
 }

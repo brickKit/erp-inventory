@@ -106,10 +106,12 @@ func (s *Service) ConfirmIssue(ctx context.Context, in repo.ConfirmIssueInput) (
 //
 // ⚠️ reservationID/idempotencyKey 二选一（设计计划 §9）：Reserve 本身
 // 超时时调用方拿不到 reservation_id，只能带着当初发的 idempotency_key
-// 来查。两个都不给才是入参错误。
-func (s *Service) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID string, err error) {
+// 来查。两个都不给才是入参错误。返回值多了 resolvedReservationID——
+// 走 idempotencyKey 分支时调用方必须能拿到真正的 reservation_id 才能
+// 存下来供后续 Cancel/ConfirmIssue 用。
+func (s *Service) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID, resolvedReservationID string, err error) {
 	if reservationID == "" && idempotencyKey == "" {
-		return "", "", fmt.Errorf("%w: reservation_id 与 idempotency_key 不能同时为空", ErrInvalidArgument)
+		return "", "", "", fmt.Errorf("%w: reservation_id 与 idempotency_key 不能同时为空", ErrInvalidArgument)
 	}
 	return s.repo.GetReservationStatus(ctx, reservationID, idempotencyKey)
 }
