@@ -1,0 +1,175 @@
+syntax = "proto3";
+
+package erp.inventory.v1;
+
+option go_package = "github.com/brickKit/erp-inventory/gen/erp/inventory/v1;inventoryv1";
+
+import "google/protobuf/timestamp.proto";
+
+// 库存服务。本组件是三枢纽之一的物理命令枢纽（设计计划 §1、§2.6）——
+// "这批货现在还有没有、能不能占"这个问题的唯一真相源。没有出边：
+// dependencies.components 永远是空数组（设计计划 §5）。
+service InventoryService {
+  // ── TCC 三件套 + 状态查询：跨组件写接口，erp-sales 建单的第一步 ──
+  // ⚠️ 这四个 rpc 永远不暴露到 REST——它们是组件间 TCC 协议的一部分，
+  // 不是人类操作（设计计划 §3）。
+  rpc Reserve            (ReserveRequest)            returns (ReserveResponse);
+  rpc CancelReservation  (CancelReservationRequest)  returns (CancelReservationResponse);
+  rpc ConfirmIssue       (ConfirmIssueRequest)       returns (ConfirmIssueResponse);
+  // GetReservationStatus 是防"薛定谔的超时"的唯一手段，不是可选项
+  // （设计计划 §4.5）。上游超时后必须先查真实状态再决定要不要 Cancel——
+  // 直接猜会导致误杀（取消了其实成功的预留）或漏杀（漏掉其实失败的）。
+  rpc GetReservationStatus(GetReservationStatusRequest) returns (GetReservationStatusResponse);
+
+  // ── 命令：入库 / 调整 ──
+  rpc Receive (ReceiveRequest) returns (ReceiveResponse);
+  rpc Adjust  (AdjustRequest)  returns (AdjustResponse);
+
+  // ── 读 ──
+  rpc GetBalance     (GetBalanceRequest)     returns (Balance);
+  // BatchGetBalance 是防 N+1 的唯一合法调用方式（§3.8）——下单页面一次
+  // 查一整单的可用量。任何时候都不许删掉它只留 GetBalance。
+  rpc BatchGetBalance(BatchGetBalanceRequest) returns (BatchGetBalanceResponse);
+  // 游标分页 + 强制时间窗口（§11.4.1、决策 53），不给 offset 参数
+  rpc ListMovements  (ListMovementsRequest)  returns (ListMovementsResponse);
+}
+
+// ⚠️ NOT_FOUND 与 CANCELLED 必须能区分——见 GetReservationStatusResponse 的注释。
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  RESERVATION_STATUS_RESERVED    = 1;   // 未决，占着但还没转实际出库
+  RESERVATION_STATUS_CONFIRMED   = 2;   // 终态：已 ConfirmIssue
+  RESERVATION_STATUS_CANCELLED   = 3;   // 终态：已撤销
+}
+
+enum MovementReason {
+  MOVEMENT_REASON_UNSPECIFIED = 0;
+  MOVEMENT_REASON_RECEIVE     = 1;   // 入库
+  MOVEMENT_REASON_ISSUE       = 2;   // 出库（ConfirmIssue 产生）
+  MOVEMENT_REASON_ADJUST_GAIN = 3;   // 盘盈
+  MOVEMENT_REASON_ADJUST_LOSS = 4;   // 盘亏
+}
+
+message ReserveItem {
+  string product_id   = 1;   // 不透明外键——本组件不校验产品是否存在（设计计划 §5）
+  string warehouse_id = 2;
+  string qty          = 3;   // decimal-as-string
+}
+
+message ReserveRequest {
+  // ⚠️ 所有跨组件写操作接口必须基于业务单号实现严格幂等（§4.6）
+  string idempotency_key = 1;
+  string order_id        = 2;   // 仅作幂等键与追溯字段，不参与任何判断逻辑（设计计划 §1）
+  repeated ReserveItem items = 3;
+}
+message ReserveResponse {
+  string reservation_id = 1;
+}
+
+message CancelReservationRequest {
+  string idempotency_key = 1;
+  string reservation_id  = 2;
+}
+message CancelReservationResponse {
+  ReservationStatus status = 1;
+}
+
+message ConfirmIssueRequest {
+  string idempotency_key = 1;
+  string reservation_id  = 2;
+  // 批次号/序列号：tracking_type 为 batch/serial 的产品填写（摘要副本校验，设计计划 §5、§9）
+  string batch_no  = 3;
+  string serial_no = 4;
+}
+message ConfirmIssueResponse {
+  ReservationStatus status    = 1;
+  string            movement_id = 2;
+}
+
+message GetReservationStatusRequest {
+  string reservation_id = 1;
+}
+message GetReservationStatusResponse {
+  // ⚠️ RESERVATION_STATUS_UNSPECIFIED 在这里就是 NOT_FOUND 的信号——
+  // "请求根本没到"（可以安全重试），与 CANCELLED"到了且已撤销"
+  // （不能重试）必须能区分，绝不许合并成一个"没有"（设计计划 §3、§4.5）。
+  ReservationStatus status = 1;
+  string order_id          = 2;
+}
+
+message ReceiveRequest {
+  string idempotency_key = 1;
+  string product_id      = 2;
+  string warehouse_id    = 3;
+  string qty             = 4;
+  string batch_no        = 5;
+  string serial_no       = 6;
+}
+message ReceiveResponse {
+  string movement_id = 1;
+}
+
+message AdjustRequest {
+  string idempotency_key = 1;
+  string product_id      = 2;
+  string warehouse_id    = 3;
+  // qty_delta 带符号：正为盘盈，负为盘亏
+  string qty_delta       = 4;
+  string reason          = 5;   // 人类可读的调整原因，阶段二不接审批（设计计划 §9 第 4 条）
+}
+message AdjustResponse {
+  string movement_id = 1;
+}
+
+message Balance {
+  string product_id    = 1;
+  string warehouse_id  = 2;
+  string on_hand_qty   = 3;
+  string reserved_qty  = 4;
+  string available_qty = 5;   // on_hand_qty - reserved_qty，服务端算好直接给，不让调用方自己减
+  int64  version        = 6;
+}
+
+message GetBalanceRequest {
+  string product_id   = 1;
+  string warehouse_id = 2;
+}
+
+message BalanceKey {
+  string product_id   = 1;
+  string warehouse_id = 2;
+}
+message BatchGetBalanceRequest {
+  repeated BalanceKey keys = 1;
+}
+message BatchGetBalanceResponse {
+  // 只返回找到的（余额行不存在等价于全 0，调用方按缺失自行判断为 0，
+  // 与 mdm-product 的 BatchGet missing_ids 风格保持一致）
+  repeated Balance balances = 1;
+}
+
+message Movement {
+  string         id            = 1;
+  string         product_id    = 2;
+  string         warehouse_id  = 3;
+  string         qty           = 4;   // 带符号
+  MovementReason reason        = 5;
+  string         order_id      = 6;
+  string         batch_no      = 7;
+  string         serial_no     = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ListMovementsRequest {
+  // ⚠️ 禁止深 Offset，强制 Cursor Pagination（决策 53）
+  string cursor      = 1;
+  int32  page_size   = 2;
+  string product_id   = 3;
+  string warehouse_id = 4;
+  google.protobuf.Timestamp created_after  = 5;
+  google.protobuf.Timestamp created_before = 6;   // 不传时框架层自动注入最近 90 天（§11.4.1）
+}
+message ListMovementsResponse {
+  repeated Movement movements  = 1;
+  string            next_cursor = 2;
+}

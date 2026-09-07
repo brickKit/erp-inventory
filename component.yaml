@@ -1,0 +1,70 @@
+apiVersion: brickkit/v1
+kind: Component
+
+metadata:
+  id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
+  name: 库存管理
+  version: 1.0.0                     # 精确版本，不接受 ^ / ~ / latest
+  description: 库存余额、流水、预留、防超卖判定——物理命令枢纽
+  license: Apache-2.0
+  vendor: brickKit
+
+tags: [erp, inventory, warehouse]
+
+artifacts:
+  - type: api-contract
+    format: protobuf
+    files:
+      - contracts/erp/inventory/v1/inventory.proto
+      - contracts/events/inventory.events.json
+  - type: api-contract
+    format: openapi
+    files: [contracts/inventory.openapi.yaml]
+  - type: metadata                   # ← assembly.yaml 靠这一条随组件分发（§3.5）
+    files: [assembly.yaml]
+
+dependencies:
+  components: []                     # ⚠️ 本组件是物理命令枢纽，零出边（设计计划 §5、§6）。
+                                      # 尤其不依赖 mdm/product——product_id 是不透明外键，
+                                      # 校验产品存在是调用方（erp-sales）的事
+  resources:
+    # ⚠️ engine 逐字参与匹配（设计书 §2.7.3.1）：这里写的词必须与
+    #    brickkit.yaml 的 resources[].engine 完全相同，平台不认别名。
+    - { kind: database, engine: postgresql }   # 产品名：不在替换范围
+    - { kind: mq,       engine: nats }         # 产品名：换 Kafka 是一次迁移，要让平台阻断
+
+configSchema:
+  type: object
+  properties:
+    pgSchema:                        # ⚠️ 不能叫 databaseSchema，DATABASE_ 是保留前缀
+      type: string
+      default: erp_inventory
+    iamJwksUrl:                      # JWT 本地验签的公钥来源。不对 IAM 建依赖边（决策 87）
+      type: string
+    otelBaseUrl:                     # ⚠️ 不能叫 otelEndpoint，*_ENDPOINT 是保留后缀
+      type: string
+      default: ""                    # 空 → Blackhole Exporter，零成本（§7.5）
+    # ⚠️ 没有 defaultPageSize/listWindowDays：踩过 mdm-customer 的坑，
+    # List 的默认页大小/时间窗口实际上是 besdk.ListWindow 的包级常量，
+    # 写在这里只会让人以为能配实际不能配。
+
+deployment:
+  type: container
+  image: brickenterprise/erp-inventory:1.0.0
+  port: 8086                         # 端口册 registry/ports.tsv
+  extraPorts:
+    - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
+  labels:                            # 平台只搬运，不解释键值。值必须是字符串
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8086"
+    prometheus.io/path: "/metrics"
+  resources:
+    requests: { cpu: "200m", memory: "256Mi" }  # 写并发最高的组件，起点比只读枢纽高一档
+
+migration:
+  command: ["./migrate", "up"]
+
+healthCheck:
+  type: http
+  path: /healthz                     # ⚠️ 只查本进程存活，严禁查库或查依赖组件（§12.3.6）
+  # startPeriodSeconds 不写：默认就是 60，Go 组件够用（§12.3.5）

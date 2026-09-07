@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  title: erp-inventory · 库存管理
+  version: 1.0.0
+  description: |
+    对外 REST 面。内部 gRPC，外部 HTTP（§2.1）。
+    ⚠️ 不暴露 Reserve/CancelReservation/ConfirmIssue/GetReservationStatus——
+    这四个是组件间 TCC 协议的一部分，不是人类操作（设计计划 §3）。
+    人类操作是"出库单"，那在 erp-sales / erp-purchase 侧。
+    BatchGetBalance 不暴露：它是给其他组件 gRPC 客户端防 N+1 用的批量读优化。
+
+servers:
+  - url: /erp/inventory
+
+# ⚠️ /healthz 不在这份契约里：be-sdk-go 的 NewGinEngine 给每个组件统一挂的，
+# 路径固定是裸根路径 /healthz（§12.3.6）。
+
+paths:
+  /movements/receive:
+    post:
+      summary: Receive（入库）
+      operationId: receiveInventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReceiveRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReceiveResponse" }
+
+  /movements/adjust:
+    post:
+      summary: Adjust（盘盈盘亏）
+      operationId: adjustInventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdjustRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdjustResponse" }
+
+  /balances:
+    get:
+      summary: GetBalance
+      operationId: getInventoryBalance
+      parameters:
+        - name: product_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: warehouse_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Balance" }
+
+  /movements:
+    get:
+      summary: ListMovements
+      operationId: listInventoryMovements
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: 游标分页（决策 53），无 offset 参数——深分页在契约层面不可表达
+        - name: page_size
+          in: query
+          schema: { type: integer }
+        - name: product_id
+          in: query
+          schema: { type: string }
+        - name: warehouse_id
+          in: query
+          schema: { type: string }
+        - name: created_after
+          in: query
+          schema: { type: string, format: date-time }
+        - name: created_before
+          in: query
+          schema: { type: string, format: date-time }
+          description: 不传时间范围时框架层自动注入最近 90 天（§11.4.1）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  movements:
+                    type: array
+                    items: { $ref: "#/components/schemas/Movement" }
+                  next_cursor: { type: string }
+
+components:
+  schemas:
+    MovementReason:
+      type: string
+      enum: [RECEIVE, ISSUE, ADJUST_GAIN, ADJUST_LOSS]
+
+    Balance:
+      type: object
+      properties:
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        on_hand_qty:
+          type: string
+          description: 金额/数量一律用 string 传 decimal，绝不用 double（跨语言精度）
+        reserved_qty: { type: string }
+        available_qty:
+          type: string
+          description: on_hand_qty - reserved_qty，服务端算好直接给
+        version: { type: integer, format: int64 }
+
+    Movement:
+      type: object
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        qty: { type: string, description: 带符号，decimal-as-string }
+        reason: { $ref: "#/components/schemas/MovementReason" }
+        order_id: { type: string }
+        batch_no: { type: string }
+        serial_no: { type: string }
+        created_at: { type: string, format: date-time }
+
+    ReceiveRequest:
+      type: object
+      required: [idempotency_key, product_id, warehouse_id, qty]
+      properties:
+        idempotency_key:
+          type: string
+          description: 跨重试幂等键（§4.6），被调用方用唯一约束去重
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        qty: { type: string }
+        batch_no: { type: string }
+        serial_no: { type: string }
+
+    ReceiveResponse:
+      type: object
+      properties:
+        movement_id: { type: string }
+
+    AdjustRequest:
+      type: object
+      required: [idempotency_key, product_id, warehouse_id, qty_delta, reason]
+      properties:
+        idempotency_key: { type: string }
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        qty_delta:
+          type: string
+          description: 带符号：正为盘盈，负为盘亏
+        reason:
+          type: string
+          description: 人类可读的调整原因，阶段二不接审批
+
+    AdjustResponse:
+      type: object
+      properties:
+        movement_id: { type: string }

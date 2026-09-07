@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "erp-inventory 事件清单",
+  "note": "Schema 演进铁律：只增不删不改（决策 19）。消费者宽容反序列化。",
+  "envelope": {
+    "description": "所有事件共用的信封。三个 Header 字段由 be-sdk 自动填/校验（§3.10）",
+    "required": ["subject", "aggregate_id", "version", "trace_id", "causation_id", "hop_count", "occurred_at"],
+    "properties": {
+      "subject":      { "type": "string", "pattern": "^[a-z]+\\.[a-z-]+\\.[a-z-]+\\.v[0-9]+$" },
+      "aggregate_id": { "type": "string" },
+      "version":      { "type": "integer", "description": "消费者只在严格大于本地当前值时更新（决策 43）" },
+      "trace_id":     { "type": "string" },
+      "causation_id": { "type": "string" },
+      "hop_count":    { "type": "integer", "maximum": 5, "description": "> 5 直接丢弃进 DLQ（决策 42）" },
+      "occurred_at":  { "type": "string", "format": "date-time" }
+    }
+  },
+  "events": [
+    {
+      "subject": "erp.inventory.adjusted.v1",
+      "grade": "core",
+      "note": "核心交易事件：必须持久化、幂等、进死信队列（§3.10 事件分级）。Receive/ConfirmIssue/Adjust 三个命令都发这条。⚠️ 只带数量不带金额——erp-finance 消费它自己按成本方法算出凭证金额（设计计划 §4）。",
+      "payload": {
+        "type": "object",
+        "required": ["product_id", "warehouse_id", "qty_delta", "movement_id", "reason"],
+        "properties": {
+          "product_id":   { "type": "string" },
+          "warehouse_id": { "type": "string" },
+          "qty_delta":    { "type": "string", "description": "带符号，decimal-as-string" },
+          "movement_id":  { "type": "string" },
+          "batch_no":     { "type": "string" },
+          "serial_no":    { "type": "string" },
+          "reason":       { "type": "string", "enum": ["RECEIVE", "ISSUE", "ADJUST_GAIN", "ADJUST_LOSS"] }
+        }
+      }
+    },
+    {
+      "subject": "erp.inventory.transferred.v1",
+      "grade": "core",
+      "note": "占位——调拨阶段二不实现（设计计划 §4）。先在事件清单里占位，避免下游以为漏查了。",
+      "payload": {
+        "type": "object",
+        "required": [],
+        "properties": {}
+      }
+    }
+  ]
+}
