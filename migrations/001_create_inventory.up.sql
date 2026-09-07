@@ -53,7 +53,8 @@ CREATE TABLE inventory_movements (
     product_id    TEXT           NOT NULL,
     warehouse_id  BIGINT         NOT NULL REFERENCES warehouses (id),
     qty           NUMERIC(18,6)  NOT NULL,   -- 带符号：出库为负，入库/盘盈为正
-    reason        TEXT           NOT NULL,   -- RECEIVE/ISSUE/ADJUST_GAIN/ADJUST_LOSS
+    reason        TEXT           NOT NULL,   -- RECEIVE/ISSUE/ADJUST_GAIN/ADJUST_LOSS，判断逻辑用它
+    note          TEXT           NOT NULL DEFAULT '',  -- Adjust 请求里那句人类可读的调整原因（如"盘点差异"），纯展示，不参与任何判断
     order_id      TEXT           NOT NULL DEFAULT '',  -- 仅幂等键/追溯字段，不参与任何判断逻辑（设计计划 §1）
     batch_no      TEXT           NOT NULL DEFAULT '',
     serial_no     TEXT           NOT NULL DEFAULT '',
@@ -76,13 +77,18 @@ CREATE INDEX inventory_movements_product_warehouse ON inventory_movements (produ
 CREATE INDEX inventory_movements_warehouse ON inventory_movements (warehouse_id, created_at);
 
 -- ⚠️ 初始分区覆盖当前月起 3 个月（迁移执行时是 2026-09）。其余分区由
--- 组件内置定时任务自动建（决策 54、§11.5.1）——本组件是按月而不是像
--- outbox/inbox 那样按周，维护任务的窗口逻辑在 Task 10 实现时另写。
-CREATE TABLE inventory_movements_2026_09 PARTITION OF inventory_movements
+-- 组件内置定时任务自动建（决策 54、§11.5.1，backend/internal/partition/
+-- monthly.go）。⚠️ 分区名必须是 "表名_YYYY_MM_01"（月份的第一天，不是
+-- "表名_YYYY_MM"）——它要和 monthly.go 里 ensurePartition 生成的名字
+-- 完全一致，否则维护任务的 to_regclass 会查不到这几个已存在的分区，
+-- 转而尝试新建同一段时间范围的分区，撞上 PostgreSQL 的分区范围不许
+-- 重叠而报错（这是实现 monthly.go 时发现的：两处生成分区名的代码路径
+-- 必须共用同一套格式，不能各写各的）。
+CREATE TABLE inventory_movements_2026_09_01 PARTITION OF inventory_movements
   FOR VALUES FROM ('2026-09-01') TO ('2026-10-01');
-CREATE TABLE inventory_movements_2026_10 PARTITION OF inventory_movements
+CREATE TABLE inventory_movements_2026_10_01 PARTITION OF inventory_movements
   FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
-CREATE TABLE inventory_movements_2026_11 PARTITION OF inventory_movements
+CREATE TABLE inventory_movements_2026_11_01 PARTITION OF inventory_movements
   FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
 -- 同 mdm-product 002 迁移的实测踩坑：建分区（CREATE TABLE ... PARTITION OF）
 -- 要求执行者是父表 owner。迁移用管理凭据跑，建出来的分区默认属于那个

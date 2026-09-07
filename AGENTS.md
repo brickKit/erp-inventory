@@ -52,6 +52,9 @@
 | 补录过去日期的出入库，改历史流水行 | ERPNext 的 repost 机制就是这么做的，代价是两把 advisory lock + 检查点文件 + 无界级联。本组件流水真的只增不改，补录用冲销流水 | 设计计划 §2.1 |
 | `GetReservationStatus` 把 `NOT_FOUND` 与 `CANCELLED` 合并成一个"没有" | 上游超时重试时会误判——`NOT_FOUND` 说明请求根本没到（能安全重试），`CANCELLED` 说明已被撤销（不能重试）。合并成一个会导致误杀或漏杀 | 设计计划 §3、§4.5 |
 | `inventory_balances` 加分区或归档 | §11.2.5 明确注明它必须永远小而快——它是全系统写并发最高的表，分区会让防超卖那条条件更新跨分区找行 | 设计计划 §7 |
+| 5 个写命令（`Reserve`/`CancelReservation`/`ConfirmIssue`/`Receive`/`Adjust`）的幂等用"先查 `command_idempotency`、查不到再插入"（mdm-product 的写法） | 单机测试永远绿——两个带同一个 `idempotency_key` 的并发请求都可能在"查不到"的窗口里各自跑一遍真正的工作，Reserve 场景下就是重复预留。必须先原子 `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` 声明（声明失败就等，查它落地的结果），声明成功才做真正的写 | `backend/internal/repo/repo.go` 的 `claimIdempotency`；设计计划 §9 |
+| 给 `inventory_movements` 的月分区起名时不看 `backend/internal/partition/monthly.go` 里 `ensurePartition` 用的格式（`表名_YYYY_MM_01`），自己拍脑袋写个别的格式（如 `表名_YYYY_MM`） | 迁移能跑通、组件能启动——但后台分区维护任务的 `to_regclass` 查不到已存在的分区，会尝试新建同一时间范围的分区，撞上 PostgreSQL"分区范围不许重叠"报错，且只在维护任务下一次检查时才炸 | 设计计划 §9 第 8 条 |
+| 往 `backend/internal/consumer` 或任何调 `besdk.Consume` 的地方传错 `role`，或以为它像旧版一样不需要 `role` | `be-sdk-go` v0.1.8 前 `Consume` 给 `fn` 的 `tx` 没切过 role/search_path，业务代码按 `WithTx` 约定写的"不带 schema 前缀"SQL 会报表不存在。**v0.1.8 起已修**，但如果哪天又有人手滑传错 role 字符串，症状是"SET LOCAL ROLE" 报错，不是静默的 | `be-sdk-go` v0.1.8 CHANGELOG；`backend/internal/consumer/consumer.go` |
 
 ## 改代码前的自查
 
@@ -60,3 +63,5 @@
 3. **我是不是在给 `inventory_balances` 加列做分区/归档？** 停下——设计计划 §7 已经判定它永不分区永不归档，除非设计计划本身先改。
 4. **这个改动会不会让 `contracts/inventory.proto` 出现破坏性变更？** 下游 `erp-sales`/`erp-purchase`/`erp-manufacturing` 都消费这份契约，只能向后兼容地追加（§3.4 铁律 3）。
 5. **我是不是在改 `inventory_movements` 里已经写入的历史行？** 停下——流水只增不改，补录用冲销流水，不改写过去。
+6. **我新加的写命令，幂等是不是走"先查后插"？** 停下——本组件的写命令必须走 claim-first（先原子声明 `command_idempotency`，声明成功才做真正的工作），理由见上表。
+7. **我是不是在给一张新的表加"迁移建初始分区 + 后台任务建后续分区"？** 两处的分区命名必须共用同一个格式/同一段代码，不能分别手写。

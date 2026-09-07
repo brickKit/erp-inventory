@@ -395,7 +395,13 @@ type ConfirmIssueRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	ReservationId  string                 `protobuf:"bytes,2,opt,name=reservation_id,json=reservationId,proto3" json:"reservation_id,omitempty"`
-	// 批次号/序列号：tracking_type 为 batch/serial 的产品填写（摘要副本校验，设计计划 §5、§9）
+	// 批次号/序列号：一次 Reserve 调用可以有多个 (product, warehouse) 项
+	// （见 ReserveRequest.items），这里的 batch_no/serial_no 对该 reservation
+	// 下的所有项统一生效。⚠️ 这是刻意的简化，不是疏漏——一次预留里有
+	// 多个需要各自不同批次/序列号的项，是"一个 Reserve 调用管一整张单"这个
+	// 设计与"批次号是单据行级信息"之间的真实张力：本阶段的解法是调用方
+	// （erp-sales）对需要各自独立批次/序列号的行分别发起 Reserve/ConfirmIssue，
+	// 不要把它们塞进同一个 reservation_id（设计计划 §9 待决问题记录了这条）。
 	BatchNo       string `protobuf:"bytes,3,opt,name=batch_no,json=batchNo,proto3" json:"batch_no,omitempty"`
 	SerialNo      string `protobuf:"bytes,4,opt,name=serial_no,json=serialNo,proto3" json:"serial_no,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -461,9 +467,11 @@ func (x *ConfirmIssueRequest) GetSerialNo() string {
 }
 
 type ConfirmIssueResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        ReservationStatus      `protobuf:"varint,1,opt,name=status,proto3,enum=erp.inventory.v1.ReservationStatus" json:"status,omitempty"`
-	MovementId    string                 `protobuf:"bytes,2,opt,name=movement_id,json=movementId,proto3" json:"movement_id,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Status ReservationStatus      `protobuf:"varint,1,opt,name=status,proto3,enum=erp.inventory.v1.ReservationStatus" json:"status,omitempty"`
+	// 一次 ConfirmIssue 会把 reservation_id 下的每一项各转成一条流水，
+	// 所以是 repeated——用单个 movement_id 装不下多项确认产生的多条流水。
+	MovementIds   []string `protobuf:"bytes,2,rep,name=movement_ids,json=movementIds,proto3" json:"movement_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -505,11 +513,11 @@ func (x *ConfirmIssueResponse) GetStatus() ReservationStatus {
 	return ReservationStatus_RESERVATION_STATUS_UNSPECIFIED
 }
 
-func (x *ConfirmIssueResponse) GetMovementId() string {
+func (x *ConfirmIssueResponse) GetMovementIds() []string {
 	if x != nil {
-		return x.MovementId
+		return x.MovementIds
 	}
-	return ""
+	return nil
 }
 
 type GetReservationStatusRequest struct {
@@ -1408,11 +1416,10 @@ const file_erp_inventory_v1_inventory_proto_rawDesc = "" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12%\n" +
 	"\x0ereservation_id\x18\x02 \x01(\tR\rreservationId\x12\x19\n" +
 	"\bbatch_no\x18\x03 \x01(\tR\abatchNo\x12\x1b\n" +
-	"\tserial_no\x18\x04 \x01(\tR\bserialNo\"t\n" +
+	"\tserial_no\x18\x04 \x01(\tR\bserialNo\"v\n" +
 	"\x14ConfirmIssueResponse\x12;\n" +
-	"\x06status\x18\x01 \x01(\x0e2#.erp.inventory.v1.ReservationStatusR\x06status\x12\x1f\n" +
-	"\vmovement_id\x18\x02 \x01(\tR\n" +
-	"movementId\"D\n" +
+	"\x06status\x18\x01 \x01(\x0e2#.erp.inventory.v1.ReservationStatusR\x06status\x12!\n" +
+	"\fmovement_ids\x18\x02 \x03(\tR\vmovementIds\"D\n" +
 	"\x1bGetReservationStatusRequest\x12%\n" +
 	"\x0ereservation_id\x18\x01 \x01(\tR\rreservationId\"v\n" +
 	"\x1cGetReservationStatusResponse\x12;\n" +
