@@ -4,7 +4,7 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.4                     # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.5                     # 精确版本，不接受 ^ / ~ / latest
                                       # v1.0.4：纯重新构建，deployment.image 之前一直
                                       # 停在 1.0.2，v1.0.3 的源码改动从没真的打进镜像
                                       # 过（阶段三 Task 4 核对 brickkit up 真机时发现）
@@ -44,6 +44,10 @@ configSchema:
       default: erp_inventory
     iamJwksUrl:                      # JWT 本地验签的公钥来源。不对 IAM 建依赖边（决策 87）
       type: string
+    authzBundleUrl:                  # 阶段三 Task 6：功能权限判定的 bundle 轮询地址，
+                                      # 指向 infra-authz。不建依赖边（同 iamJwksUrl 的
+                                      # 判据，设计书 §14.1.4）
+      type: string
     otelBaseUrl:                     # ⚠️ 不能叫 otelEndpoint，*_ENDPOINT 是保留后缀
       type: string
       default: ""                    # 空 → Blackhole Exporter，零成本（§7.5）
@@ -53,7 +57,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.4
+  image: brickenterprise/erp-inventory:1.0.5
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）

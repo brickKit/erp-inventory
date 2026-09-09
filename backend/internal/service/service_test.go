@@ -51,6 +51,22 @@ func warehouseID(t *testing.T, db *sql.DB, code string) string {
 	return strconv.FormatInt(id, 10)
 }
 
+// authedCtx 造一个"已经过 RequirePermission 验签"的 ctx（besdk.ContextWithClaims，
+// 阶段三 Task 6 发现的真实缺口，见 be-sdk-go authz.go 同名函数注释），
+// 并真的把 sub 授权到 warehouseIDs——service 层调用 GetBalance/Receive/
+// Adjust/ListMovements 时会真的查 warehouse_access 表，只造一份假 Claims
+// 不授权访问，一样会被 ErrForbidden 拦下来，测的就不是"输入校验"这件事了。
+func authedCtx(t *testing.T, r *repo.Repo, sub string, warehouseIDs ...string) context.Context {
+	t.Helper()
+	ctx := context.Background()
+	for _, whID := range warehouseIDs {
+		if err := r.GrantWarehouseAccess(ctx, sub, whID); err != nil {
+			t.Fatalf("授权仓库访问失败：%v", err)
+		}
+	}
+	return besdk.ContextWithClaims(ctx, besdk.Claims{Sub: sub})
+}
+
 var svcProductSeq int64
 
 func svcUniqueProductID(prefix string) string {
@@ -132,11 +148,11 @@ func TestAdjust_qtyDelta为0时拒绝(t *testing.T) {
 // （盘亏），只有 0 和非法格式才拒绝。
 func TestAdjust_负数是合法输入(t *testing.T) {
 	svc, r, db := newTestService(t)
-	ctx := context.Background()
 	east := warehouseID(t, db, "WH-EAST")
 	pid := svcUniqueProductID("svc-l3-adjust-neg-ok")
+	ctx := authedCtx(t, r, "u_test-adjust-neg-ok", east)
 
-	if _, err := r.Receive(ctx, repo.ReceiveInput{
+	if _, err := svc.Receive(ctx, repo.ReceiveInput{
 		IdempotencyKey: "svc-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}

@@ -45,6 +45,23 @@ func warehouseID(t *testing.T, db *sql.DB, code string) string {
 	return strconv.FormatInt(id, 10)
 }
 
+// allowedWarehouses 把 warehouseID() 返回的字符串 id 转成
+// Receive/Adjust/GetBalance/ListMovements 需要的 []int64 授权列表——
+// 测试里"调用者能访问哪些仓库"就是它要操作的那几个仓库本身，本组件的
+// 授权分配流程（GrantWarehouseAccess）另有 access_test.go 单独测。
+func allowedWarehouses(t *testing.T, ids ...string) []int64 {
+	t.Helper()
+	out := make([]int64, len(ids))
+	for i, s := range ids {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			t.Fatalf("warehouse id 不是数字：%q", s)
+		}
+		out[i] = n
+	}
+	return out
+}
+
 // uniqueProductID 给每个测试造一个独立的 product_id，测试之间不共享
 // 余额行，互不干扰（同一张表被多个测试并发跑时尤其重要）。
 var productSeq int64
@@ -59,10 +76,11 @@ func TestReceive_基本入库(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("recv")
 
 	movementID, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10",
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +89,7 @@ func TestReceive_基本入库(t *testing.T) {
 		t.Fatal("期望返回非空 movement_id")
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,14 +103,15 @@ func TestReceive_幂等(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("recv-idem")
 	key := "test-recv-idem-" + pid
 
-	id1, err := r.Receive(ctx, ReceiveInput{IdempotencyKey: key, ProductID: pid, WarehouseID: east, Qty: "5"})
+	id1, err := r.Receive(ctx, ReceiveInput{IdempotencyKey: key, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "5"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id2, err := r.Receive(ctx, ReceiveInput{IdempotencyKey: key, ProductID: pid, WarehouseID: east, Qty: "5"})
+	id2, err := r.Receive(ctx, ReceiveInput{IdempotencyKey: key, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "5"})
 	if err != nil {
 		t.Fatalf("幂等重试报错了：%v", err)
 	}
@@ -100,7 +119,7 @@ func TestReceive_幂等(t *testing.T) {
 		t.Fatalf("幂等失效：第一次 %s，第二次 %s", id1, id2)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,8 +133,9 @@ func TestGetBalance_没有余额行时返回0而不是报错(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 
-	b, err := r.GetBalance(ctx, uniqueProductID("never-received"), east)
+	b, err := r.GetBalance(ctx, uniqueProductID("never-received"), east, allowed)
 	if err != nil {
 		t.Fatalf("从没收过货的 (product,warehouse) 应该返回 0 余额而不是报错：%v", err)
 	}
@@ -129,10 +149,11 @@ func TestReserve_库存不足时拒绝且不留痕迹(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("insufficient")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "3"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "3"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -144,7 +165,7 @@ func TestReserve_库存不足时拒绝且不留痕迹(t *testing.T) {
 		t.Fatalf("库存 3 件预留 5 件应该报 ErrInsufficientStock，实际：%v", err)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,10 +179,11 @@ func TestReserve_幂等(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("reserve-idem")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,7 +203,7 @@ func TestReserve_幂等(t *testing.T) {
 		t.Fatalf("幂等失效：第一次 %s，第二次 %s", rid1, rid2)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,15 +217,16 @@ func TestReserve_多项其中一项不够时整单回滚(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pidOK := uniqueProductID("multi-ok")
 	pidShort := uniqueProductID("multi-short")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pidOK, ProductID: pidOK, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pidOK, ProductID: pidOK, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pidShort, ProductID: pidShort, WarehouseID: east, Qty: "1"}); err != nil {
+		IdempotencyKey: "test-recv-" + pidShort, ProductID: pidShort, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "1"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -219,7 +242,7 @@ func TestReserve_多项其中一项不够时整单回滚(t *testing.T) {
 	}
 
 	// 第一项即使够，也不该留下预留痕迹——一次 Reserve 调用必须整单原子。
-	bOK, err := r.GetBalance(ctx, pidOK, east)
+	bOK, err := r.GetBalance(ctx, pidOK, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,10 +256,11 @@ func TestCancelReservation_释放后余额恢复且可安全重复调用(t *test
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("cancel")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	rid, err := r.Reserve(ctx, ReserveInput{
@@ -256,7 +280,7 @@ func TestCancelReservation_释放后余额恢复且可安全重复调用(t *test
 		t.Fatalf("期望 CANCELLED，实际 %q", status)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,10 +305,11 @@ func TestConfirmIssue_确认后onHand与reserved都扣减且发流水(t *testing
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("confirm")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	rid, err := r.Reserve(ctx, ReserveInput{
@@ -307,7 +332,7 @@ func TestConfirmIssue_确认后onHand与reserved都扣减且发流水(t *testing
 		t.Fatalf("一项预留确认应该产生 1 条流水，实际 %d 条", len(movementIDs))
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,6 +360,7 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("status")
 
 	status, _, _, err := r.GetReservationStatus(ctx, "999999999", "")
@@ -346,7 +372,7 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	}
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	rid, err := r.Reserve(ctx, ReserveInput{
@@ -383,11 +409,12 @@ func TestGetReservationStatus_按idempotencyKey查(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("status-idem")
 	idemKey := "test-reserve-idem-" + pid
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-idem-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-idem-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	rid, err := r.Reserve(ctx, ReserveInput{
@@ -444,10 +471,11 @@ func TestAdjust_不能调到低于已预留量(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("adjust-guard")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.Reserve(ctx, ReserveInput{
@@ -459,7 +487,7 @@ func TestAdjust_不能调到低于已预留量(t *testing.T) {
 
 	// on_hand=10, reserved=8。盘亏 5 会把 on_hand 调到 5，低于已预留的 8——必须拒绝。
 	_, err := r.Adjust(ctx, AdjustInput{
-		IdempotencyKey: "test-adjust-" + pid, ProductID: pid, WarehouseID: east,
+		IdempotencyKey: "test-adjust-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed,
 		QtyDelta: "-5", Reason: "盘点差异",
 	})
 	if !errors.Is(err, ErrInsufficientStock) {
@@ -472,20 +500,21 @@ func TestAdjust_盘盈盘亏正确记流水与note(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("adjust-ok")
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, Qty: "10"}); err != nil {
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, Qty: "10"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.Adjust(ctx, AdjustInput{
-		IdempotencyKey: "test-adjust-" + pid, ProductID: pid, WarehouseID: east,
+		IdempotencyKey: "test-adjust-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed,
 		QtyDelta: "-3", Reason: "盘点差异",
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +522,7 @@ func TestAdjust_盘盈盘亏正确记流水与note(t *testing.T) {
 		t.Fatalf("期望盘亏后 on_hand=7，实际 %q", b.OnHandQty)
 	}
 
-	res, err := r.ListMovements(ctx, ListInput{ProductID: pid, WarehouseID: east, PageSize: 10})
+	res, err := r.ListMovements(ctx, ListInput{ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed, PageSize: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,13 +548,14 @@ func TestReserve_并发防超卖(t *testing.T) {
 	ctx := context.Background()
 	r := New(db, "erp_inventory_rw", "erp_inventory")
 	east := warehouseID(t, db, "WH-EAST")
+	allowed := allowedWarehouses(t, east)
 	pid := uniqueProductID("concurrent")
 
 	const stock = 30     // M：库存只够 30 个
 	const attempts = 100 // N：100 个并发请求，每个要 1 件
 
 	if _, err := r.Receive(ctx, ReceiveInput{
-		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east,
+		IdempotencyKey: "test-recv-" + pid, ProductID: pid, WarehouseID: east, AllowedWarehouseIDs: allowed,
 		Qty: strconv.Itoa(stock),
 	}); err != nil {
 		t.Fatal(err)
@@ -563,7 +593,7 @@ func TestReserve_并发防超卖(t *testing.T) {
 		t.Fatalf("期望恰好 %d 个失败，实际 %d 个", attempts-stock, got)
 	}
 
-	b, err := r.GetBalance(ctx, pid, east)
+	b, err := r.GetBalance(ctx, pid, east, allowed)
 	if err != nil {
 		t.Fatal(err)
 	}

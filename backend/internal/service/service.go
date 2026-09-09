@@ -11,8 +11,21 @@ import (
 	"log/slog"
 	"strconv"
 
+	besdk "github.com/brickKit/be-sdk-go"
 	"github.com/brickKit/erp-inventory/backend/internal/repo"
 )
+
+// allowedWarehouseIDs 是 Receive/Adjust/GetBalance/ListMovements 四个
+// REST 端点共用的一步：从 besdk.ScopeOf(ctx) 取 sub、查 warehouse_access
+// 表拿到这个人当前能访问的仓库列表。⚠️ 只用于这四个 REST 端点——
+// Reserve/CancelReservation/ConfirmIssue/BatchGetBalance 是组件间 gRPC
+// 协议（erp-sales 等调用方），ctx 里没有经过 besdk.RequirePermission
+// 验签的 Claims，调 ScopeOf 会 panic，这是设计使然（阶段三 Task 6
+// 讨论定案：gRPC 侧数据权限透传是更大的独立工作，不在本任务范围）。
+func (s *Service) allowedWarehouseIDs(ctx context.Context) ([]int64, error) {
+	sub := besdk.ScopeOf(ctx).Owner
+	return s.repo.WarehouseIDsFor(ctx, sub)
+}
 
 // ErrInvalidArgument 是入参本身不合法（同 mdm-product 的判据）。
 var ErrInvalidArgument = errors.New("参数不合法")
@@ -131,6 +144,11 @@ func (s *Service) Receive(ctx context.Context, in repo.ReceiveInput) (string, er
 	if err := validateQty("qty", in.Qty, false); err != nil {
 		return "", err
 	}
+	allowed, err := s.allowedWarehouseIDs(ctx)
+	if err != nil {
+		return "", err
+	}
+	in.AllowedWarehouseIDs = allowed
 	movementID, err := s.repo.Receive(ctx, in)
 	if err != nil {
 		s.logger.Error("入库失败", "product_id", in.ProductID, "warehouse_id", in.WarehouseID, "error", err)
@@ -152,6 +170,11 @@ func (s *Service) Adjust(ctx context.Context, in repo.AdjustInput) (string, erro
 	if err := validateQty("qty_delta", in.QtyDelta, true); err != nil {
 		return "", err
 	}
+	allowed, err := s.allowedWarehouseIDs(ctx)
+	if err != nil {
+		return "", err
+	}
+	in.AllowedWarehouseIDs = allowed
 	movementID, err := s.repo.Adjust(ctx, in)
 	if err != nil {
 		s.logger.Error("库存调整失败", "product_id", in.ProductID, "warehouse_id", in.WarehouseID, "error", err)
@@ -166,13 +189,48 @@ func (s *Service) GetBalance(ctx context.Context, productID, warehouseID string)
 	if productID == "" || warehouseID == "" {
 		return nil, fmt.Errorf("%w: product_id/warehouse_id 不能为空", ErrInvalidArgument)
 	}
-	return s.repo.GetBalance(ctx, productID, warehouseID)
+	allowed, err := s.allowedWarehouseIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetBalance(ctx, productID, warehouseID, allowed)
 }
 
+// BatchGetBalance 是组件间 gRPC 协议（erp-sales 等的批量读），不经过
+// besdk.RequirePermission，ctx 里没有 Claims——不调 allowedWarehouseIDs，
+// 见该方法注释。
 func (s *Service) BatchGetBalance(ctx context.Context, keys []repo.BalanceKey) ([]*repo.Balance, error) {
 	return s.repo.BatchGetBalance(ctx, keys)
 }
 
 func (s *Service) ListMovements(ctx context.Context, in repo.ListInput) (*repo.ListResult, error) {
+	allowed, err := s.allowedWarehouseIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in.AllowedWarehouseIDs = allowed
 	return s.repo.ListMovements(ctx, in)
+}
+
+// ── warehouse_access 管理（阶段三 Task 6）──
+
+func (s *Service) ListWarehouseAccess(ctx context.Context, sub string) ([]int64, error) {
+	if sub == "" {
+		return nil, fmt.Errorf("%w: sub 不能为空", ErrInvalidArgument)
+	}
+	return s.repo.WarehouseIDsFor(ctx, sub)
+}
+
+func (s *Service) GrantWarehouseAccess(ctx context.Context, sub, warehouseID string) error {
+	if sub == "" || warehouseID == "" {
+		return fmt.Errorf("%w: sub/warehouse_id 不能为空", ErrInvalidArgument)
+	}
+	return s.repo.GrantWarehouseAccess(ctx, sub, warehouseID)
+}
+
+func (s *Service) RevokeWarehouseAccess(ctx context.Context, sub, warehouseID string) error {
+	if sub == "" || warehouseID == "" {
+		return fmt.Errorf("%w: sub/warehouse_id 不能为空", ErrInvalidArgument)
+	}
+	return s.repo.RevokeWarehouseAccess(ctx, sub, warehouseID)
 }

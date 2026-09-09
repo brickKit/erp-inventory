@@ -36,10 +36,11 @@ data_scopes:
       tables: [inventory_balances, inventory_movements, inventory_reservations] }
 
 permissions:
-  - { key: erp.inventory.view,    title: 查看库存,     type: page   }
-  - { key: erp.inventory.reserve, title: 预留库存,     type: action }
-  - { key: erp.inventory.issue,   title: 确认出库,     type: action }
-  - { key: erp.inventory.receive, title: 入库,         type: action }
-  - { key: erp.inventory.adjust,  title: 盘盈盘亏调整, type: action }
+  - { key: erp.inventory.view,           title: 查看库存,         type: page   }
+  - { key: erp.inventory.reserve,        title: 预留库存,         type: action }
+  - { key: erp.inventory.issue,          title: 确认出库,         type: action }
+  - { key: erp.inventory.receive,        title: 入库,             type: action }
+  - { key: erp.inventory.adjust,         title: 盘盈盘亏调整,     type: action }
+  - { key: erp.inventory.manage_access,  title: 分配仓库访问权限, type: action }
 
 shell: go-core                       # 合并部署时进外壳一（§13.2）

@@ -32,6 +32,23 @@ var ErrNotFound = errors.New("not found")
 // 从没有过余额行"的情形（等价于库存为 0），不需要单独分辨。
 var ErrInsufficientStock = errors.New("库存不足")
 
+// ErrForbidden：调用者对某个具体仓库没有 warehouse_access 授权（阶段三
+// Task 6，§14.2.2 的 warehouse 维）。⚠️ 只用于"点名一个具体仓库、但没有
+// 权限"这种场景（GetBalance/Receive/Adjust）——不是 ErrNotFound：那个仓库
+// 是真实存在的，调用者只是看不见，与"查无此仓库"的语义不同，不能混用。
+var ErrForbidden = errors.New("无权访问该仓库")
+
+// containsInt64 判断 id 是不是在 allowed 里——GetBalance/Receive/Adjust
+// 校验"点名的这个仓库我到底有没有权限"共用的小工具。
+func containsInt64(allowed []int64, id int64) bool {
+	for _, v := range allowed {
+		if v == id {
+			return true
+		}
+	}
+	return false
+}
+
 // Repo 持有共享池 + 本组件的 role/schema，写操作一律经 besdk.WithTx 切换。
 type Repo struct {
 	db     *sql.DB
@@ -109,10 +126,17 @@ type Balance struct {
 
 // GetBalance：查不到余额行等价于库存为 0（从没收过货），不是错误——
 // 一个从没进过货的 (product, warehouse) 组合问"还有多少"，答案就是 0。
-func (r *Repo) GetBalance(ctx context.Context, productID, warehouseID string) (*Balance, error) {
+//
+// allowedWarehouseIDs 是调用者当前的 warehouse_access 授权列表（阶段三
+// Task 6）——点名的 warehouseID 不在这份列表里就是 ErrForbidden，不是
+// "库存为 0"：那两种情况对调用者的含义完全不同。
+func (r *Repo) GetBalance(ctx context.Context, productID, warehouseID string, allowedWarehouseIDs []int64) (*Balance, error) {
 	whID, err := parseWarehouseID(warehouseID)
 	if err != nil {
 		return nil, err
+	}
+	if !containsInt64(allowedWarehouseIDs, whID) {
+		return nil, ErrForbidden
 	}
 	var b Balance
 	err = besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
@@ -244,6 +268,10 @@ type ReceiveInput struct {
 	Qty            string
 	BatchNo        string
 	SerialNo       string
+	// AllowedWarehouseIDs 是调用者当前的 warehouse_access 授权列表
+	// （阶段三 Task 6）——service 层从 besdk.ScopeOf(ctx) 取 sub 查出来
+	// 再传进来，repo 层本身不碰 ScopeOf（那是纯 HTTP/JWT 层的概念）。
+	AllowedWarehouseIDs []int64
 }
 
 // Receive 入库：on_hand 加、写流水、发 erp.inventory.adjusted.v1。
@@ -262,6 +290,9 @@ func (r *Repo) Receive(ctx context.Context, in ReceiveInput) (string, error) {
 		whID, err := parseWarehouseID(in.WarehouseID)
 		if err != nil {
 			return err
+		}
+		if !containsInt64(in.AllowedWarehouseIDs, whID) {
+			return ErrForbidden
 		}
 
 		// 先确保余额行存在（首次收货这个 (product, warehouse) 组合），
@@ -309,6 +340,8 @@ type AdjustInput struct {
 	WarehouseID    string
 	QtyDelta       string
 	Reason         string // 人类可读的调整原因（如"盘点差异"），落进 movements.note
+	// AllowedWarehouseIDs 见 ReceiveInput 同名字段注释。
+	AllowedWarehouseIDs []int64
 }
 
 // Adjust 盘盈盘亏：条件更新同时守住"不能调到负库存"与"不能调到低于已预留
@@ -329,6 +362,9 @@ func (r *Repo) Adjust(ctx context.Context, in AdjustInput) (string, error) {
 		whID, err := parseWarehouseID(in.WarehouseID)
 		if err != nil {
 			return err
+		}
+		if !containsInt64(in.AllowedWarehouseIDs, whID) {
+			return ErrForbidden
 		}
 
 		if _, err := tx.ExecContext(ctx, `
@@ -438,6 +474,10 @@ type ListInput struct {
 	WarehouseID   string
 	CreatedAfter  time.Time
 	CreatedBefore time.Time
+	// AllowedWarehouseIDs 是调用者当前的 warehouse_access 授权列表
+	// （阶段三 Task 6）——**必须**下推进 SQL 的 WHERE 子句，不能查出
+	// 结果后在 Go 里再过滤：那会破坏分页（决策 53、§14.2.4 的既有判据）。
+	AllowedWarehouseIDs []int64
 }
 
 type ListResult struct {
@@ -469,6 +509,13 @@ func (r *Repo) ListMovements(ctx context.Context, in ListInput) (*ListResult, er
 			FROM inventory_movements
 			WHERE created_at >= $1 AND created_at <= $2`
 		args := []any{q.From, q.To}
+		// ⚠️ warehouse_access 过滤永远加，即使调用者没有任何授权——
+		// pgx/v5 的 database/sql 驱动直接把 []int64 编码成 PostgreSQL
+		// 数组参数（同 BatchGetBalance 已验证过的既有判据），nil/空切片
+		// 都会让 `= ANY(...)` 天然匹配不到任何行——这就是"没有分配=谁
+		// 都看不见"的正确 fail-closed 结果，不需要为空列表特判。
+		args = append(args, in.AllowedWarehouseIDs)
+		query += fmt.Sprintf(" AND warehouse_id = ANY($%d::bigint[])", len(args))
 		if in.ProductID != "" {
 			args = append(args, in.ProductID)
 			query += fmt.Sprintf(" AND product_id = $%d", len(args))
