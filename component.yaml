@@ -4,10 +4,16 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.5                     # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.6                     # 精确版本，不接受 ^ / ~ / latest
                                       # v1.0.4：纯重新构建，deployment.image 之前一直
                                       # 停在 1.0.2，v1.0.3 的源码改动从没真的打进镜像
                                       # 过（阶段三 Task 4 核对 brickkit up 真机时发现）
+                                      # v1.0.6：升级 be-sdk-go 到 v0.2.4——gRPC server 加
+                                      # panic-recovery 拦截器，修真机测试发现的严重问题：
+                                      # Receive/Adjust/GetBalance/ListMovements 四个
+                                      # REST-only 方法被 gRPC 直连（ctx 无 Claims）会
+                                      # panic 崩掉整个容器（docs/dev/实测踩坑记录.md C11），
+                                      # 无破坏性变更
   description: 库存余额、流水、预留、防超卖判定——物理命令枢纽
   license: Apache-2.0
   vendor: brickKit
@@ -57,7 +63,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.5
+  image: brickenterprise/erp-inventory:1.0.6
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
