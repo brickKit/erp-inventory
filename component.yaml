@@ -4,7 +4,17 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.7                     # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.8                     # 精确版本，不接受 ^ / ~ / latest
+                                      # v1.0.8：新增 make seed/db-reset（总纲 SOP-W-7，
+                                      # 自成一体假数据 + 探测 mdm-product 顺手灌真实
+                                      # 产品库存，取代 infra/seed-data 里原来的裸 SQL
+                                      # 步骤）；顺带修了一个真实 bug——
+                                      # 003_seed_warehouses.down.sql 的 DELETE 在
+                                      # migrate down 倒序执行时（004→001）会撞上
+                                      # inventory_balances 的外键（001 的 down 还没跑到，
+                                      # 表还在），这条路径此前从未被真机跑过，`make
+                                      # db-reset` 第一次真跑就复现，改成留空（001 的
+                                      # down 本来就会整表一起删）
                                       # v1.0.7：docs/手册.md 的 TEST_PG_DSN 示例改指向
                                       # brickkit_test_db（测试库与演示库分开，见根
                                       # AGENTS.md），纯文档，无行为/契约变更
@@ -66,7 +76,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.7
+  image: brickenterprise/erp-inventory:1.0.8
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）

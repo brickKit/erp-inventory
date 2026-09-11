@@ -1,1 +1,15 @@
-DELETE FROM warehouses WHERE code IN ('WH-EAST', 'WH-SOUTH');
+-- 有意留空：不删这两行种子仓库。
+--
+-- ⚠️ 实测踩坑（`make db-reset` 第一次真机跑通 down 迁移时发现——这条
+-- 路径此前从未被真正执行过，只是"代码写着对"）：down 迁移按版本号
+-- 倒序执行（004→003→002→001），执行到本文件时 001 创建的
+-- inventory_balances/inventory_movements/inventory_reservations 三张表
+-- 还没被删——如果这两个仓库已经有任何一条引用它们的库存行（种子数据、
+-- 真实业务数据都算），这里的 DELETE 会撞上
+-- inventory_balances_warehouse_id_fkey 外键约束报错，导致整个
+-- `migrate down` 半途而废、schema_migrations 表被标记 dirty，需要人工
+-- 介入才能恢复。
+--
+-- 001_create_inventory.down.sql 本身已经会 DROP TABLE warehouses（连同
+-- 这两行种子数据一起消失），这里重复删一次没有必要，纯粹是画蛇添足
+-- 还带着一个真实会触发的 bug。

@@ -2,7 +2,7 @@ IMAGE   := brickenterprise/erp-inventory
 VERSION := $(shell grep -E '^\s+version:' component.yaml | head -1 | awk '{print $$2}')
 
 .DEFAULT_GOAL := help
-.PHONY: help all check-version test image migrate-idempotent dag-check contract-check import-scan module-check docs-check smoke
+.PHONY: help all check-version test image migrate-idempotent dag-check contract-check import-scan module-check docs-check smoke seed db-reset
 
 help:  ## 列出所有目标
 	@awk 'BEGIN{FS=":.*##"; printf "\n用法: make <目标>\n\n"} \
@@ -96,3 +96,21 @@ smoke:  ## 原则一：只装这一个组件就能起来（§1.5、§3.11 第 8 
 	@# brickkit 不向上找 brickkit.yaml，必须从装配仓库根目录跑——本组件
 	@# 固定挂在 components/erp/inventory 下，根目录固定是 ../../..
 	@(cd ../../.. && brickkit up --dry-run >/dev/null) && echo "✓ smoke（完整版见 make tier0）"
+
+##@ 本地开发数据（总纲 SOP-W-7，仅本地/演示用，不进部署/CI）
+seed:  ## 灌本组件自己的示例库存数据（幂等，可重复跑）。链式建好身份/授权（Receive/Adjust 要真实 JWT + warehouse_access），单独跑就能拿到完整数据
+	@$(MAKE) -C ../../infra/iam-casdoor seed
+	@$(MAKE) -C ../../infra/authz seed
+	@bash scripts/seed.sh
+
+db-reset:  ## 完整重置本组件数据库（migrate down 再 up）——不是 seed-clean
+	@# 本组件没有 seed-clean：inventory_movements"只增不改"（AGENTS.md），
+	@# 逐行 DELETE 既做不到"干净复原"（BIGSERIAL 序列不会回退，见总纲
+	@# SOP-W-7），又违背这条设计原则本身。想清空种子数据只能整库重置。
+	@# ⚠️ 会清空本组件全部数据（不止 seed 灌的），不是精确撤销；重置期间
+	@# 建议先 brickkit down 掉本组件容器，避免它连接池里缓存的语句撞上
+	@# 被删重建的表。需要 DATABASE_HOST/PORT/USER/PASSWORD/NAME + PG_SCHEMA。
+	@go build -o /tmp/erp-inventory-migrate-probe ./backend/cmd/migrate
+	@/tmp/erp-inventory-migrate-probe down
+	@/tmp/erp-inventory-migrate-probe up
+	@echo "✓ 数据库已重置到迁移后的初始状态（含 WH-EAST/WH-SOUTH 基线数据）"
