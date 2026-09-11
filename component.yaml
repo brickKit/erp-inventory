@@ -4,7 +4,13 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.8                     # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.9                     # 精确版本，不接受 ^ / ~ / latest
+                                      # v1.0.9：scripts/seed.sh 探测式关联 mdm-product
+                                      # 那一步的 idempotency_key 从位置编号改成真实产品
+                                      # id（`seed-inv-recv-real-$PID`）——固定编号在
+                                      # mdm-product 被 seed-clean 后产品 id 轮换时会
+                                      # 静默绑死旧 id，新 id 永远拿不到库存，真机走两轮
+                                      # clean/reseed 循环时复现（实测踩坑记录 C22）
                                       # v1.0.8：新增 make seed/db-reset（总纲 SOP-W-7，
                                       # 自成一体假数据 + 探测 mdm-product 顺手灌真实
                                       # 产品库存，取代 infra/seed-data 里原来的裸 SQL
@@ -76,7 +82,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.8
+  image: brickenterprise/erp-inventory:1.0.9
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）

@@ -189,7 +189,15 @@ if schema_exists mdm_product; then
   for i in 1 2 3 4; do
     PID="$(real_product_id "$i")"
     if [ -n "$PID" ]; then
-      receive "seed-inv-recv-real-$i" "$PID" "$WH_EAST" 200 >/dev/null
+      # ⚠️ 实测踩坑：idempotency_key 之前固定写成 seed-inv-recv-real-$i
+      # （按位置编号），mdm-product 的种子数据被 seed-clean 后用新 id
+      # 重建（真实 id 会变，不是稳定值）时，claim-first 幂等会让这个
+      # 固定 key 永远返回"第一次那个旧 id"的缓存结果，新 id 悄悄一件
+      # 库存都拿不到——crm-opportunity 的商机会正常引用新 id，Reserve
+      # 找不到对应余额行，走 TCC 补偿建异常待办，且没有任何报错指出
+      # 根因。key 必须带上真实解析出来的 product id 本身，id 一变自然
+      # 是全新的 key，不会撞上旧缓存（记入踩坑记录 C22）。
+      receive "seed-inv-recv-real-$PID" "$PID" "$WH_EAST" 200 >/dev/null
       FOUND=$((FOUND + 1))
     fi
   done
