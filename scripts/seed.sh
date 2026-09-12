@@ -113,7 +113,24 @@ SEED_SUB="$(echo "$USER_JSON" | python3 -c 'import json,sys; d=json.load(sys.std
 echo "── 给 dev.superuser 授权 WH-EAST/WH-SOUTH 两个仓库（幂等）──"
 authed -X POST "$INV_REST/erp/inventory/warehouse-access/$SEED_SUB" -d "{\"warehouse_id\":\"$WH_EAST\"}" >/dev/null
 authed -X POST "$INV_REST/erp/inventory/warehouse-access/$SEED_SUB" -d "{\"warehouse_id\":\"$WH_SOUTH\"}" >/dev/null
-ok "warehouse_access 已就绪"
+ok "warehouse_access 已就绪（dev.superuser）"
+
+# ⚠️ 数据权限维度要有真实存在感（总纲 SOP-W-7）：只给 dev.superuser 一个
+# 全权限账号看不出"warehouse 维数据权限"这个能力真的存在——额外给
+# infra-authz 种的仓管测试用户（dev.warehouse.south，角色
+# dev_warehouse_manager）只授权 WH-SOUTH 一个仓库，不给 WH-EAST，这样
+# "华南仓管看不到华东仓库存"这个数据权限边界才有真实账号能登录体验，
+# 不只是纯自动化测试里才存在。这里独立向 Casdoor 查这个用户名的 sub
+# （同 infra-authz 自己 seed.sh 的既有判据：各组件各自查，不建交接
+# 协议），查不到就说明 infra-authz 的种子身份还没跑，优雅跳过不中断
+# 本组件自己的①②两步。
+WAREHOUSE_MANAGER_SUB="$(curl -b "$COOKIE_JAR" -s "$CASDOOR_URL/api/get-user?id=brickkit/dev.warehouse.south" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["id"] if d else "")')"
+if [ -n "$WAREHOUSE_MANAGER_SUB" ]; then
+  authed -X POST "$INV_REST/erp/inventory/warehouse-access/$WAREHOUSE_MANAGER_SUB" -d "{\"warehouse_id\":\"$WH_SOUTH\"}" >/dev/null
+  ok "warehouse_access 已就绪（dev.warehouse.south → 仅 WH-SOUTH，不含 WH-EAST，演示仓库维数据权限边界）"
+else
+  echo "  （没探测到 dev.warehouse.south——不是依赖，只是 infra-authz 的种子身份还没建，跳过）"
+fi
 
 receive() { # key product_id warehouse_id qty [batch] [serial]
   authed -X POST "$INV_REST/erp/inventory/movements/receive" \
@@ -186,7 +203,16 @@ real_product_id() { psqlx -tA -q -c "SET search_path TO mdm_product; SELECT resu
 
 FOUND=0
 if schema_exists mdm_product; then
-  for i in 1 2 3 4; do
+  # ⚠️ 实测踩坑：这里原来只探测 1-4 号（mdm-product 早期只有 5 个种子
+  # 产品时的量），mdm-product 扩到 12 个后，crm-opportunity 用 6 号往后
+  # 的产品建的 WON 商机赢单转订单会因为这里没给对应产品灌库存，Reserve
+  # 真实拿不到余额走 TCC 补偿建异常待办——不是 bug，是"下游可以、也
+  # 应该倒逼上游丰富数据"这条判据（总纲 SOP-W-7）第一次真实触发：
+  # 探测范围必须跟着 mdm-product 实际种了多少产品走，不能停留在建这个
+  # 探测步骤那一刻的产品数量。11 号是最后一个 ACTIVE 的（12 号是刻意
+  # 停用的样例），11 也一起灌无害（不透明外键，erp-inventory 不关心
+  # 对方是不是 DISABLED）。
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
     PID="$(real_product_id "$i")"
     if [ -n "$PID" ]; then
       # ⚠️ 实测踩坑：idempotency_key 之前固定写成 seed-inv-recv-real-$i
