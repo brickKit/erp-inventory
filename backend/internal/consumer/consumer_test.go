@@ -37,6 +37,27 @@ func natsURLForTest(t *testing.T) string {
 	return nats.DefaultURL
 }
 
+// testSubject 给消费者测试造一个测试私有的 subject，不直接用生产真实
+// subject。
+//
+// ⚠️ 实测踩坑（docs/dev/field-tested-pitfalls-log.md 类别 E 的 E2）：这两条
+// 测试原来直接订阅/发布到真实 subject（如 "mdm.product.created.v1"），
+// 而同一台机器上 `brickkit up` 真实跑着的 erp-inventory 容器订阅的是
+// **同一个** subject——NATS 核心发布订阅对同一 subject 的多个订阅者是
+// 广播，两边都会收到测试发布的消息，谁先把 event_inbox 那一行 INSERT
+// 成功谁就真正执行 handler，断言读到的可能是真实容器的产出，不是本地
+// 被测代码的产出。
+//
+// 换一个测试私有的 subject 就能让真实容器完全收不到——它们只订阅生产
+// subject 字面量，不会去猜一个带随机后缀的名字。这个换法是安全的：
+// besdk.Consume 的 fn 只用 ev.Subject 拼错误信息，不拿它做任何业务判断，
+// 换成任意字符串不影响被测逻辑本身。这条规避法只适用于"测试直接构造/
+// 发布事件"的消费者测试——验证"真的发到了生产 subject 上"这件事本身的
+// 测试必须用真实 subject，不适用这个换法（本文件没有这类测试）。
+func testSubject(base string) string {
+	return fmt.Sprintf("test.%s.%d", base, time.Now().UnixNano())
+}
+
 func publishProductEvent(t *testing.T, nc *nats.Conn, subject, productID, trackingType string, version int64) {
 	t.Helper()
 	payload := fmt.Sprintf(`{"id":%q,"tracking_type":%q,"version":%d}`, productID, trackingType, version)
@@ -74,16 +95,17 @@ func TestConsumer_created事件维护摘要副本(t *testing.T) {
 	defer nc.Close()
 
 	productID := fmt.Sprintf("consumer-test-%d", time.Now().UnixNano())
+	subj := testSubject("mdm.product.created.v1")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
-		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", "mdm.product.created.v1", handle)
+		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", subj, handle)
 		close(done)
 	}()
 	time.Sleep(150 * time.Millisecond)
 
-	publishProductEvent(t, nc, "mdm.product.created.v1", productID, "BATCH", 1)
+	publishProductEvent(t, nc, subj, productID, "BATCH", 1)
 	nc.Flush()
 	time.Sleep(400 * time.Millisecond)
 	cancel()
@@ -112,27 +134,29 @@ func TestConsumer_跨subject乱序时旧版本不覆盖新版本(t *testing.T) {
 	defer nc.Close()
 
 	productID := fmt.Sprintf("consumer-test-order-%d", time.Now().UnixNano())
+	subjCreated := testSubject("mdm.product.created.v1")
+	subjUpdated := testSubject("mdm.product.updated.v1")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	doneCreated := make(chan struct{})
 	doneUpdated := make(chan struct{})
 	go func() {
-		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", "mdm.product.created.v1", handle)
+		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", subjCreated, handle)
 		close(doneCreated)
 	}()
 	go func() {
-		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", "mdm.product.updated.v1", handle)
+		_ = besdk.Consume(ctx, nc, db, "erp_inventory_rw", "erp_inventory", subjUpdated, handle)
 		close(doneUpdated)
 	}()
 	time.Sleep(150 * time.Millisecond)
 
 	// 先发 version=2（updated，模拟"新的"），再发 version=1（created，
 	// 模拟"旧的"网络延迟后到）。
-	publishProductEvent(t, nc, "mdm.product.updated.v1", productID, "SERIAL", 2)
+	publishProductEvent(t, nc, subjUpdated, productID, "SERIAL", 2)
 	nc.Flush()
 	time.Sleep(300 * time.Millisecond)
-	publishProductEvent(t, nc, "mdm.product.created.v1", productID, "NONE", 1)
+	publishProductEvent(t, nc, subjCreated, productID, "NONE", 1)
 	nc.Flush()
 	time.Sleep(400 * time.Millisecond)
 	cancel()
