@@ -17,13 +17,48 @@
 就能单独跑起来——它不对 IAM 建依赖边，JWT 走本地验签（决策 87）。
 
 ## 怎么起来
-（Task 10 实现完成后补：装配路径 + 单独跑的完整命令）
+
+```bash
+# 装配仓库根目录
+make up
+cd components/erp/inventory
+go build -o build/migrate ./backend/cmd/migrate
+PG_SCHEMA=erp_inventory DATABASE_HOST=localhost DATABASE_PORT=5432 \
+  DATABASE_USER=postgres DATABASE_PASSWORD=<.env 里的 POSTGRES_PASSWORD> DATABASE_NAME=brickkit_db \
+  ./build/migrate up
+go run ./backend/cmd/server     # 单独跑：besdk.RunStandalone 读 component.yaml 的端口
+```
+
+或者用平台：`brickkit up`（装配仓库根目录，`components/erp/inventory` 登记为 submodule 且在 `brickkit.yaml` 里之后）。也可以直接 `make seed`/`make db-reset`（见根 `docs/dev/种子数据一览.md`）——自成一体的演示数据，不依赖任何其他组件先起来。
 
 ## 怎么用
-（Task 10 后补：一条 curl + 一条 grpcurl）
+
+```bash
+# 入库（REST，人类操作）
+curl -X POST -H 'Authorization: Bearer <应用 token>' -H 'Content-Type: application/json' \
+  -d '{"idempotency_key":"recv-demo-1","product_id":"1","warehouse_id":"1","qty":"100"}' \
+  http://localhost:8086/erp/inventory/movements/receive
+
+# 查余额
+curl -H 'Authorization: Bearer <应用 token>' \
+  'http://localhost:8086/erp/inventory/balances?product_id=1&warehouse_id=1'
+
+# 预留库存（gRPC，组件间 TCC 协议，永不暴露到 REST，人类不直接调）
+grpcurl -plaintext -d '{
+  "idempotency_key": "reserve-demo-1",
+  "order_id": "order-1",
+  "items": [{"product_id": "1", "warehouse_id": "1", "qty": "5"}]
+}' localhost:9096 erp.inventory.v1.InventoryService/Reserve
+```
 
 ## 配置项
-（Task 9 写完 component.yaml 后补，平台注入的保留变量单列一段）
+
+| 配置键 | 默认值 | 说明 |
+|---|---|---|
+| `pgSchema` | `erp_inventory` | 本组件的 PG schema |
+| `otelBaseUrl` | `""` | 空 = Blackhole Exporter，零成本 |
+| `iamJwksUrl` | `""` | JWT 本地验签的公钥来源，指向 `infra-iam-casdoor` |
+| `authzBundleUrl` | `""` | 权限判定的 bundle 轮询地址，指向 `infra-authz` |
 
 ## 参考实现
 | 项目 | 看的模块 | 借鉴了什么 | 许可证（已复核） | 用法 |

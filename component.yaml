@@ -4,7 +4,12 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.10                    # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.11                    # 精确版本，不接受 ^ / ~ / latest
+                                      # v1.0.11：补齐 README.md 的"怎么起来"/"怎么用"/
+                                      # "配置项"三节——建仓库时留的占位符一直没人回来
+                                      # 填，`make docs-check` 的占位符检测正则同时修正
+                                      # （原来只查 TBD/TODO/待补，没覆盖实际用的"后补"
+                                      # 措辞）。纯文档，无行为/契约变更。
                                       # v1.0.10：make seed 探测 mdm-product 种子数据那
                                       # 一步的循环范围从 1 2 3 4 改成
                                       # 1 2 3 4 5 6 7 8 9 10 11 12——mdm-product 这一轮
@@ -91,7 +96,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.10
+  image: brickenterprise/erp-inventory:1.0.11
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
