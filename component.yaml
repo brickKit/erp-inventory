@@ -4,7 +4,22 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.11                    # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.12                    # 精确版本，不接受 ^ / ~ / latest
+                                      # v1.0.12：补 TestProperty_库存三大不变式/
+                                      # TestProperty_Reserve并发同key仅执行一次——
+                                      # 04-testing-standard.md §3.2 对"核心交易类组件"
+                                      # 的强制要求（L2 必须用属性测试，例子测试不够），
+                                      # 全项目系统排查测试完整性时发现三个核心交易类
+                                      # 组件（本组件/erp-finance/erp-sales）从建组件起
+                                      # 就没写过一个属性测试，此次补齐。用 rapid 随机
+                                      # 生成 Receive/Reserve/ConfirmIssue/
+                                      # CancelReservation/Adjust 操作序列攻击同一个
+                                      # (product,warehouse)，验证"on_hand 永不为负/
+                                      # reserved 永不为负/available 永不为负"三条不变式；
+                                      # 并补上此前从没测过的"并发同 key 只执行一次"
+                                      # （已有的 TestReserve_并发防超卖 测的是"不同 key
+                                      # 抢同一批库存"，不是这条）。纯补测试，无行为/
+                                      # 契约变更。
                                       # v1.0.11：补齐 README.md 的"怎么起来"/"怎么用"/
                                       # "配置项"三节——建仓库时留的占位符一直没人回来
                                       # 填，`make docs-check` 的占位符检测正则同时修正
@@ -96,7 +111,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.11
+  image: brickenterprise/erp-inventory:1.0.12
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
