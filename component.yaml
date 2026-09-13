@@ -4,7 +4,8 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.13                    # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.14                    # 精确版本，不接受 ^ / ~ / latest
+                                     # v1.0.14：gen/erp/inventory 拆成独立嵌套 go module，理由与做法同 erp/finance 这次改动（阶段四调研记录 04 §13）。本仓库自己 standalone 构建/测试用本地 replace 完全不受影响，import-scan/单测全绿。无业务行为/契约变更。
                                       # v1.0.13：消费者测试改用测试私有 subject
                                       # （`testSubject()`），不再直接订阅/发布生产 subject
                                       # 字面量——04-testing-standard.md §3.4 第一条要求，
@@ -119,7 +120,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.13
+  image: brickenterprise/erp-inventory:1.0.14
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
