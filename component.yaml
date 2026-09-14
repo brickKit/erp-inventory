@@ -4,7 +4,8 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.15                    # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.16                    # 精确版本，不接受 ^ / ~ / latest
+                                     # v1.0.16：同 mdm/customer 这次改动，删掉 deployment.labels 的 prometheus.io/port，理由同上。无业务行为/契约变更。
                                      # v1.0.15：import-scan 门禁提前补上铁律六第二类白名单，理由同 erp/finance 这次改动（设计书§13.3）。本组件目前没有任何代码实际用到这条豁免，无行为变更。
                                      # v1.0.14：gen/erp/inventory 拆成独立嵌套 go module，理由与做法同 erp/finance 这次改动（阶段四调研记录 04 §13）。本仓库自己 standalone 构建/测试用本地 replace 完全不受影响，import-scan/单测全绿。无业务行为/契约变更。
                                       # v1.0.13：消费者测试改用测试私有 subject
@@ -121,13 +122,20 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.15
+  image: brickenterprise/erp-inventory:1.0.16
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
   labels:                            # 平台只搬运，不解释键值。值必须是字符串
     prometheus.io/scrape: "true"
-    prometheus.io/port: "8086"
+    # prometheus.io/port 原来写在这里——阶段四附加 Task 0.1 真机验证
+    # servedBy 时发现这个标签会跟同外壳其它成员的 prometheus.io/port 撞车
+    # 报错（每个组件的值天然不同，servedBy 的 labels 合并规则没有像 env
+    # 变量合并那样排除这类"语义上必然因组件而异"的标签，已反馈给 brickKit，
+    # 见装配仓库 docs/dev/brickKit反馈-servedBy的labels合并漏了排除规则.md）。
+    # 在 brickKit 修复或给出结论之前，暂时从这里删掉，只在合并后的外壳
+    # 自己的条目上保留一份——跟"合并后指标只能走一个共享抓取端口"这个
+    # 事实本来就一致，不是单纯绕过。
     prometheus.io/path: "/metrics"
   resources:
     requests: { cpu: "200m", memory: "256Mi" }  # 写并发最高的组件，起点比只读枢纽高一档
