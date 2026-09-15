@@ -4,7 +4,8 @@ kind: Component
 metadata:
   id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
   name: 库存管理
-  version: 1.0.16                    # 精确版本，不接受 ^ / ~ / latest
+  version: 1.0.17                    # 精确版本，不接受 ^ / ~ / latest
+                                     # v1.0.17：同 mdm/customer 这次改动，scripts/seed.sh 里既有 docker ps 容器名发现（gRPC 直连 Reserve/ConfirmIssue）又有宿主机 localhost 端口假设（REST 调用 + Casdoor/infra-iam-casdoor 换 JWT）两类坑，一并修复：gRPC 目标地址改用 ServiceName() 规则拼；REST 调用改成起一次性工具箱容器加入 brickkit 网络内部访问，不再假设任何组件把端口发布到宿主机。真机在 servedBy 部署下跑通 make seed（含①自成一体演示数据、②探测 mdm-product 灌真实库存两步）。无业务行为/契约变更。
                                      # v1.0.16：同 mdm/customer 这次改动，删掉 deployment.labels 的 prometheus.io/port，理由同上。无业务行为/契约变更。
                                      # v1.0.15：import-scan 门禁提前补上铁律六第二类白名单，理由同 erp/finance 这次改动（设计书§13.3）。本组件目前没有任何代码实际用到这条豁免，无行为变更。
                                      # v1.0.14：gen/erp/inventory 拆成独立嵌套 go module，理由与做法同 erp/finance 这次改动（阶段四调研记录 04 §13）。本仓库自己 standalone 构建/测试用本地 replace 完全不受影响，import-scan/单测全绿。无业务行为/契约变更。
@@ -122,7 +123,7 @@ configSchema:
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.16
+  image: brickenterprise/erp-inventory:1.0.17
   port: 8086                         # 端口册 registry/ports.tsv
   extraPorts:
     - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）

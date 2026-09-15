@@ -49,16 +49,44 @@ ok()  { echo "${C_GRN}✓${C_OFF} $*"; }
 die() { echo "${C_RED}✗${C_OFF} $*" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"; }
-need curl; need python3; need docker
+need python3; need docker
 
-CASDOOR_URL="${CASDOOR_URL:-http://localhost:8000}"
-IAM_URL="${IAM_URL:-http://localhost:8200}"
-INV_REST="${INV_REST:-http://localhost:8086}"
+# ⚠️ 真机踩到的坑（阶段四附加 Task 0.5）：brickKit 的 servedBy 合并
+# 部署下，本组件/infra-iam-casdoor 都可能被收编进某个外壳，没有独立
+# 容器、也没有发布到宿主机的端口（Casdoor 本身是带外容器，不受影响，
+# 仍然走宿主机映射端口）——这条脚本因此不再直接从宿主机 curl，改成起
+# 一个一次性"工具箱"容器加入 brickkit 自己的 docker 网络，全部 curl
+# 改在里面跑；目标地址按 brickKit 自己给依赖方注入 *_ENDPOINT 时用的
+# 同一条转换规则拼（componentId+version 转小写、"/"和"."全部替换成
+# "-"——brickKit 源码 internal/manifest/servicename.go 的
+# ServiceName()，已向 brickKit 确认这条规则不区分部署形态）。
+component_version() {
+  awk -v id="$1" '$0 ~ "^  - id: "id"$"{f=1;next} f&&/^    version:/{print $2;exit}' "$ROOT/brickkit.yaml"
+}
+service_name() { echo "$1-$(component_version "$1")" | tr '[:upper:]' '[:lower:]' | tr '/.' '--'; }
+
+NET="${BRICKKIT_NET:-brickkit-$(basename "$ROOT")-net}"
+docker network inspect "$NET" >/dev/null 2>&1 || die "docker 网络 $NET 不存在——先把本组件 brickkit up 起来（整套或只装这一个，servedBy 合并部署也可以）"
+
+TOOLBOX="seed-toolbox-$$"
+# ⚠️ 真机踩到的坑：--user 必须跟宿主机当前用户一致——COOKIE_JAR 是
+# host 侧 mktemp 建出来的（属主是宿主机用户，权限 0600），curlimages/curl
+# 镜像默认用镜像自带的非 root 用户跑，不加 --user 的话容器内的 curl
+# 连自己的 cookie jar 都没权限读写（`-c`/`-b` 全部静默失败，Casdoor 返回
+# "Please login first"，症状极难看出是权限问题不是登录逻辑问题）。
+docker run -d --rm --name "$TOOLBOX" --network "$NET" \
+  --user "$(id -u):$(id -g)" --add-host host.docker.internal:host-gateway -v /tmp:/tmp \
+  curlimages/curl:latest sleep 3600 >/dev/null
+curl() { docker exec -i "$TOOLBOX" curl "$@"; }
+
+CASDOOR_URL="${CASDOOR_URL:-http://host.docker.internal:8000}"
+IAM_URL="${IAM_URL:-http://$(service_name infra/iam-casdoor):8200}"
+INV_REST="${INV_REST:-http://$(service_name erp/inventory):8086}"
 SEED_USER="dev.superuser"
 SEED_PASSWORD="DevSeed123!"
 SEED_APP="local-dev-seed-app"
 COOKIE_JAR="$(mktemp)"
-trap 'rm -f "$COOKIE_JAR"' EXIT
+trap 'rm -f "$COOKIE_JAR"; docker rm -f "$TOOLBOX" >/dev/null 2>&1' EXIT
 
 curl -sf -o /dev/null "$INV_REST/healthz" || die "erp-inventory（$INV_REST）连不上，先 brickkit up"
 
@@ -145,13 +173,10 @@ adjust() { # key product_id warehouse_id qty_delta reason
 
 # Reserve/ConfirmIssue 是组件间 TCC 协议（不进 REST），service 层不调
 # ScopeOf——不需要 Bearer token，直接 grpcurl（同 erp-sales 调用它们的
-# 方式，见脚本顶部注释）。
-NET="${BRICKKIT_NET:-brickkit-$(basename "$ROOT")-net}"
-docker network inspect "$NET" >/dev/null 2>&1 || die "docker 网络 $NET 不存在"
-CNAME="$(docker ps --filter "name=${NET%-net}-erp-inventory-" --format '{{.Names}}' | head -1)"
+# 方式，见脚本顶部注释）。目标地址同上（service_name），不依赖独立容器。
 GRPC_PORT="$(awk -F'\t' '$2=="erp/inventory"{print $4}' "$ROOT/registry/ports.tsv")"
 GRPCURL="docker run --rm --network $NET -v $DIR/contracts:/contracts:ro fullstorydev/grpcurl:latest"
-TARGET="$CNAME:$GRPC_PORT"
+TARGET="$(service_name erp/inventory):$GRPC_PORT"
 CALL() { $GRPCURL -plaintext -import-path /contracts -proto erp/inventory/v1/inventory.proto -d "$1" "$TARGET" "erp.inventory.v1.InventoryService/$2"; }
 
 reserve() { # key product_id warehouse_id qty order_id -> reservation_id
