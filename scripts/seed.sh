@@ -43,90 +43,25 @@
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="$(cd "$DIR/../../.." && pwd)"
+source "$ROOT/infra/scripts/lib/seed-net.sh"
 
-C_GRN=$'\033[32m'; C_RED=$'\033[31m'; C_OFF=$'\033[0m'
-ok()  { echo "${C_GRN}✓${C_OFF} $*"; }
-die() { echo "${C_RED}✗${C_OFF} $*" >&2; exit 1; }
-
-need() { command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"; }
 need python3; need docker
 
-# ⚠️ 真机踩到的坑（阶段四附加 Task 0.5）：brickKit 的 servedBy 合并
-# 部署下，本组件/infra-iam-casdoor 都可能被收编进某个外壳，没有独立
-# 容器、也没有发布到宿主机的端口（Casdoor 本身是带外容器，不受影响，
-# 仍然走宿主机映射端口）——这条脚本因此不再直接从宿主机 curl，改成起
-# 一个一次性"工具箱"容器加入 brickkit 自己的 docker 网络，全部 curl
-# 改在里面跑；目标地址按 brickKit 自己给依赖方注入 *_ENDPOINT 时用的
-# 同一条转换规则拼（componentId+version 转小写、"/"和"."全部替换成
-# "-"——brickKit 源码 internal/manifest/servicename.go 的
-# ServiceName()，已向 brickKit 确认这条规则不区分部署形态）。
-component_version() {
-  awk -v id="$1" '$0 ~ "^  - id: "id"$"{f=1;next} f&&/^    version:/{print $2;exit}' "$ROOT/brickkit.yaml"
-}
-service_name() { echo "$1-$(component_version "$1")" | tr '[:upper:]' '[:lower:]' | tr '/.' '--'; }
+seed_net_check
+with_toolbox
 
-NET="${BRICKKIT_NET:-brickkit-$(basename "$ROOT")-net}"
-docker network inspect "$NET" >/dev/null 2>&1 || die "docker 网络 $NET 不存在——先把本组件 brickkit up 起来（整套或只装这一个，servedBy 合并部署也可以）"
-
-TOOLBOX="seed-toolbox-$$"
-# ⚠️ 真机踩到的坑：--user 必须跟宿主机当前用户一致——COOKIE_JAR 是
-# host 侧 mktemp 建出来的（属主是宿主机用户，权限 0600），curlimages/curl
-# 镜像默认用镜像自带的非 root 用户跑，不加 --user 的话容器内的 curl
-# 连自己的 cookie jar 都没权限读写（`-c`/`-b` 全部静默失败，Casdoor 返回
-# "Please login first"，症状极难看出是权限问题不是登录逻辑问题）。
-docker run -d --rm --name "$TOOLBOX" --network "$NET" \
-  --user "$(id -u):$(id -g)" --add-host host.docker.internal:host-gateway -v /tmp:/tmp \
-  curlimages/curl:latest sleep 3600 >/dev/null
-curl() { docker exec -i "$TOOLBOX" curl "$@"; }
-
-CASDOOR_URL="${CASDOOR_URL:-http://host.docker.internal:8000}"
-IAM_URL="${IAM_URL:-http://$(service_name infra/iam-casdoor):8200}"
 INV_REST="${INV_REST:-http://$(service_name erp/inventory):8086}"
 SEED_USER="dev.superuser"
-SEED_PASSWORD="DevSeed123!"
-SEED_APP="local-dev-seed-app"
-COOKIE_JAR="$(mktemp)"
-trap 'rm -f "$COOKIE_JAR"; docker rm -f "$TOOLBOX" >/dev/null 2>&1' EXIT
-
-curl -sf -o /dev/null "$INV_REST/healthz" || die "erp-inventory（$INV_REST）连不上，先 brickkit up"
-
-psqlx() { docker exec -i be-postgres psql -U postgres -d brickkit_db -v ON_ERROR_STOP=1 "$@"; }
+check_healthz "$INV_REST/healthz" "erp-inventory"
 
 wh_id() { psqlx -tA -q -c "SET search_path TO erp_inventory; SELECT id FROM warehouses WHERE code = '$1';"; }
 WH_EAST="$(wh_id WH-EAST)"; WH_SOUTH="$(wh_id WH-SOUTH)"
 [ -n "$WH_EAST" ] && [ -n "$WH_SOUTH" ] || die "查不到 WH-EAST/WH-SOUTH——迁移播种数据（003_seed_warehouses）没跑？"
 
-# infra-authz 的 bundle 是各组件每 ~15s 轮询一次拉进内存的——Makefile
-# 链式调用刚跑完 infra-authz 的 seed 时，立刻拿 JWT 调自己的 REST 接口
-# 有真实的竞态窗口，等 18 秒让 bundle 刷新到最新授权（同 crm-opportunity
-# 的既有判据）。
-echo "   等 18 秒，让本组件的权限 bundle 轮询到最新授权……"
-sleep 18
+wait_bundle_refresh
 
 echo "── 换一个真实 JWT，供调自己的 REST 接口用 ──"
-curl -c "$COOKIE_JAR" -s -o /dev/null -X POST "$CASDOOR_URL/api/login" \
-  -H "Content-Type: application/json" \
-  -d '{"application":"app-built-in","organization":"built-in","username":"admin","password":"123","autoSignin":true,"type":"login"}'
-APP_JSON="$(curl -b "$COOKIE_JAR" -s "$CASDOOR_URL/api/get-application?id=admin/$SEED_APP")"
-# strict=False：Casdoor 的 customCss 字段被真实登录过一次后会带字面
-# 换行符，见 docs/dev/实测踩坑记录.md C19。
-CLIENT_ID="$(echo "$APP_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin, strict=False)["data"]["clientId"])')"
-CLIENT_SECRET="$(echo "$APP_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin, strict=False)["data"]["clientSecret"])')"
-
-ID_TOKEN="$(curl -s -X POST "$CASDOOR_URL/api/login/oauth/access_token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=password" \
-  --data-urlencode "username=$SEED_USER" \
-  --data-urlencode "password=$SEED_PASSWORD" \
-  --data-urlencode "client_id=$CLIENT_ID" \
-  --data-urlencode "client_secret=$CLIENT_SECRET" \
-  --data-urlencode "scope=openid profile email" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id_token"])')"
-[ -n "$ID_TOKEN" ] || die "拿不到 Casdoor id_token"
-
-ACCESS_TOKEN="$(curl -s -X POST "$IAM_URL/api/iam/token" \
-  -H "Content-Type: application/json" \
-  -d "{\"casdoor_id_token\": \"$ID_TOKEN\"}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
-[ -n "$ACCESS_TOKEN" ] || die "换应用 JWT 失败"
+ACCESS_TOKEN="$(get_app_jwt "$SEED_USER")"
 ok "已换到真实应用 JWT"
 
 authed() { curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" "$@"; }
@@ -134,8 +69,7 @@ authed() { curl -s -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: ap
 # ── 拿 dev.superuser 的 sub（Casdoor 内部用户 id，不是用户名）：
 # warehouse_access 表与 JWT 的 sub claim 都用这个值，跟 infra-authz 自己
 # 的 seed.sh 解析方式一致 ──
-USER_JSON="$(curl -b "$COOKIE_JAR" -s "$CASDOOR_URL/api/get-user?id=brickkit/$SEED_USER")"
-SEED_SUB="$(echo "$USER_JSON" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["id"] if d else "")')"
+SEED_SUB="$(sub_of "$SEED_USER")"
 [ -n "$SEED_SUB" ] || die "Casdoor 里找不到 $SEED_USER"
 
 echo "── 给 dev.superuser 授权 WH-EAST/WH-SOUTH 两个仓库（幂等）──"
@@ -152,7 +86,7 @@ ok "warehouse_access 已就绪（dev.superuser）"
 # （同 infra-authz 自己 seed.sh 的既有判据：各组件各自查，不建交接
 # 协议），查不到就说明 infra-authz 的种子身份还没跑，优雅跳过不中断
 # 本组件自己的①②两步。
-WAREHOUSE_MANAGER_SUB="$(curl -b "$COOKIE_JAR" -s "$CASDOOR_URL/api/get-user?id=brickkit/dev.warehouse.south" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["id"] if d else "")')"
+WAREHOUSE_MANAGER_SUB="$(sub_of dev.warehouse.south)"
 if [ -n "$WAREHOUSE_MANAGER_SUB" ]; then
   authed -X POST "$INV_REST/erp/inventory/warehouse-access/$WAREHOUSE_MANAGER_SUB" -d "{\"warehouse_id\":\"$WH_SOUTH\"}" >/dev/null
   ok "warehouse_access 已就绪（dev.warehouse.south → 仅 WH-SOUTH，不含 WH-EAST，演示仓库维数据权限边界）"
@@ -224,7 +158,7 @@ schema_exists() {
   out="$(psqlx -tA -q -c "SELECT 1 FROM information_schema.schemata WHERE schema_name = '$1';" 2>/dev/null)" || true
   [ "$out" = "1" ]
 }
-real_product_id() { psqlx -tA -q -c "SET search_path TO mdm_product; SELECT result_id FROM command_idempotency WHERE idempotency_key = 'seed-product-$1';"; }
+real_product_id() { idfor mdm_product "seed-product-$1"; }
 
 FOUND=0
 if schema_exists mdm_product; then
