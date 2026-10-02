@@ -33,6 +33,9 @@ func RegisterRoutes(eng *gin.Engine, svc *service.Service) {
 	besdk.POST(g, "/movements/receive", "erp.inventory.receive", receiveHandler(svc))
 	besdk.POST(g, "/movements/adjust", "erp.inventory.adjust", adjustHandler(svc))
 	besdk.GET(g, "/balances", "erp.inventory.view", getBalanceHandler(svc))
+	besdk.GET(g, "/balances/list", "erp.inventory.view", listBalancesHandler(svc))
+	besdk.GET(g, "/warehouses", "erp.inventory.view", listWarehousesHandler(svc))
+	besdk.GET(g, "/stats/summary", "erp.inventory.view", statsSummaryHandler(svc))
 	besdk.GET(g, "/movements", "erp.inventory.view", listMovementsHandler(svc))
 	besdk.GET(g, "/warehouse-access/:sub", "erp.inventory.manage_access", listWarehouseAccessHandler(svc))
 	besdk.POST(g, "/warehouse-access/:sub", "erp.inventory.manage_access", grantWarehouseAccessHandler(svc))
@@ -215,5 +218,61 @@ func revokeWarehouseAccessHandler(svc *service.Service) gin.HandlerFunc {
 			return
 		}
 		c.Status(http.StatusOK)
+	}
+}
+
+// ── 仓库、余额列表、库存统计（都按调用者的 warehouse_access 过滤）──
+
+func listWarehousesHandler(svc *service.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		whs, err := svc.ListWarehouses(c.Request.Context())
+		if err != nil {
+			_ = c.Error(service.ToStatus(err))
+			return
+		}
+		out := make([]gin.H, 0, len(whs))
+		for _, w := range whs {
+			out = append(out, gin.H{"id": w.ID, "code": w.Code, "name": w.Name, "status": w.Status})
+		}
+		c.JSON(http.StatusOK, gin.H{"warehouses": out})
+	}
+}
+
+func listBalancesHandler(svc *service.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		pageSize, _ := strconv.Atoi(c.Query("page_size"))
+		out, err := svc.ListBalances(c.Request.Context(), repo.BalanceListInput{
+			Cursor: c.Query("cursor"), PageSize: pageSize,
+			ProductID: c.Query("product_id"), WarehouseID: c.Query("warehouse_id"),
+		})
+		if err != nil {
+			_ = c.Error(service.ToStatus(err))
+			return
+		}
+		dtos := make([]gin.H, 0, len(out.Balances))
+		for _, b := range out.Balances {
+			dtos = append(dtos, toBalanceDTO(b))
+		}
+		c.JSON(http.StatusOK, gin.H{"balances": dtos, "next_cursor": out.NextCursor})
+	}
+}
+
+func statsSummaryHandler(svc *service.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		sum, err := svc.StockSummary(c.Request.Context())
+		if err != nil {
+			_ = c.Error(service.ToStatus(err))
+			return
+		}
+		low := make([]gin.H, 0, len(sum.LowStock))
+		for _, it := range sum.LowStock {
+			low = append(low, gin.H{
+				"product_id": it.ProductID, "warehouse_id": it.WarehouseID, "available_qty": it.AvailableQty,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"sku_count": sum.SKUCount, "total_on_hand_qty": sum.TotalOnHandQty,
+			"low_stock": low, "low_stock_count": sum.LowStockCount,
+		})
 	}
 }

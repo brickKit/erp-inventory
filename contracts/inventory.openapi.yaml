@@ -68,6 +68,66 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Balance" }
 
+  /balances/list:
+    get:
+      summary: ListBalances（余额列表，按调用者有授权的仓库过滤）
+      operationId: listInventoryBalances
+      description: |
+        余额是当前状态，行数上限是「产品数 × 仓库数」，所以没有默认时间窗口；
+        按余额行 id 升序、游标分页。`GET /balances` 仍是单条查询，语义不变。
+      parameters:
+        - name: product_id
+          in: query
+          schema: { type: string }
+        - name: warehouse_id
+          in: query
+          schema: { type: string }
+          description: 调用者没有这个仓库的授权时结果为空
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: 游标分页，无 offset 参数；非法游标返回 400
+        - name: page_size
+          in: query
+          schema: { type: integer }
+          description: 默认 50，上限 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BalanceList" }
+
+  /warehouses:
+    get:
+      summary: ListWarehouses（调用者有授权的仓库）
+      operationId: listInventoryWarehouses
+      description: |
+        仓库是迁移播种的主数据（几十行量级），一次返回调用者有授权的全部仓库，
+        按 id 升序，不分页。没有任何授权时返回空列表。
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WarehouseList" }
+
+  /stats/summary:
+    get:
+      summary: StockSummary（仪表盘库存统计，按调用者有授权的仓库统计）
+      operationId: getInventoryStatsSummary
+      description: |
+        sku_count：可见仓库里在手量大于 0 的不同产品数。total_on_hand_qty：可见
+        仓库的在手量合计。low_stock：可用量（在手 - 已预留）低于配置项
+        LOW_STOCK_THRESHOLD 的余额行，按可用量升序，最多 50 条；low_stock_count
+        是满足条件的总行数。比较全程用十进制，不经过浮点数。
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockSummary" }
+
   /movements:
     get:
       summary: ListMovements
@@ -125,6 +185,46 @@ components:
           type: string
           description: on_hand_qty - reserved_qty，服务端算好直接给
         version: { type: integer, format: int64 }
+
+    BalanceList:
+      type: object
+      properties:
+        balances:
+          type: array
+          items: { $ref: "#/components/schemas/Balance" }
+        next_cursor: { type: string, description: 空串表示没有下一页 }
+
+    Warehouse:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        status: { type: string }
+
+    WarehouseList:
+      type: object
+      properties:
+        warehouses:
+          type: array
+          items: { $ref: "#/components/schemas/Warehouse" }
+
+    LowStockItem:
+      type: object
+      properties:
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        available_qty: { type: string, description: decimal-as-string }
+
+    StockSummary:
+      type: object
+      properties:
+        sku_count: { type: integer, format: int64 }
+        total_on_hand_qty: { type: string, description: decimal-as-string }
+        low_stock:
+          type: array
+          items: { $ref: "#/components/schemas/LowStockItem" }
+        low_stock_count: { type: integer, format: int64 }
 
     Movement:
       type: object

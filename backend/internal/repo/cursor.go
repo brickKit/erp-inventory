@@ -40,3 +40,20 @@ func decodeCursor(s string) (cursorKey, error) {
 	}
 	return cursorKey{CreatedAt: t, ID: id}, nil
 }
+
+// encodeIDCursor / decodeIDCursor 是按单个自增 id 排序的列表（余额列表）的游标。
+func encodeIDCursor(id int64) string {
+	return base64.RawURLEncoding.EncodeToString([]byte("id|" + strconv.FormatInt(id, 10)))
+}
+
+func decodeIDCursor(s string) (int64, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return 0, err
+	}
+	rest, ok := strings.CutPrefix(string(raw), "id|")
+	if !ok {
+		return 0, fmt.Errorf("格式不对：%q", string(raw))
+	}
+	return strconv.ParseInt(rest, 10, 64)
+}

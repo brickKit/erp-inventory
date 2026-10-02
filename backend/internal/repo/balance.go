@@ -122,3 +122,87 @@ func (r *Repo) BatchGetBalance(ctx context.Context, keys []BalanceKey) ([]*Balan
 	}
 	return out, nil
 }
+
+// BalanceListInput 对应 GET /balances/list。
+type BalanceListInput struct {
+	Cursor      string
+	PageSize    int
+	ProductID   string // 可选
+	WarehouseID string // 可选；不在授权列表里时结果为空
+	// AllowedWarehouseIDs 是调用者的 warehouse_access 授权列表，下推进 WHERE。
+	AllowedWarehouseIDs []int64
+}
+
+type BalanceListResult struct {
+	Balances   []*Balance
+	NextCursor string
+}
+
+// listBalancesSQL：余额是当前状态（行数上限是「产品数 × 仓库数」），没有时间
+// 窗口；按余额行 id 升序做 keyset 分页。可选过滤写成"参数为空就不限"。
+const listBalancesSQL = `
+	SELECT id, product_id, warehouse_id, on_hand_qty, reserved_qty,
+	       on_hand_qty - reserved_qty, version
+	  FROM inventory_balances
+	 WHERE warehouse_id = ANY($1::bigint[])
+	   AND ($2::text = '' OR product_id = $2::text)
+	   AND ($3::bigint IS NULL OR warehouse_id = $3::bigint)
+	   AND id > $4
+	 ORDER BY id
+	 LIMIT $5`
+
+// ListBalances 列出调用者有授权的仓库里的余额行。
+func (r *Repo) ListBalances(ctx context.Context, in BalanceListInput) (*BalanceListResult, error) {
+	limit := besdk.ListWindow(besdk.Query{Limit: in.PageSize}).Limit // 只取分页上限，不要时间窗口
+	var after int64
+	if in.Cursor != "" {
+		id, err := decodeIDCursor(in.Cursor)
+		if err != nil {
+			return nil, fmt.Errorf("%w: 非法 cursor：%v", ErrInvalidArgument, err)
+		}
+		after = id
+	}
+	var warehouseFilter any // 不按仓库过滤时是 NULL
+	if in.WarehouseID != "" {
+		whID, err := parseWarehouseID(in.WarehouseID)
+		if err != nil {
+			return nil, err
+		}
+		warehouseFilter = whID
+	}
+	allowed := in.AllowedWarehouseIDs
+	if allowed == nil {
+		allowed = []int64{}
+	}
+
+	out := &BalanceListResult{Balances: []*Balance{}}
+	err := besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, listBalancesSQL,
+			allowed, in.ProductID, warehouseFilter, after, limit+1) // 多取一条判断是否还有下一页
+		if err != nil {
+			return fmt.Errorf("查 inventory_balances: %w", err)
+		}
+		defer rows.Close()
+		var lastID int64
+		for rows.Next() {
+			var b Balance
+			var rawID, rawWarehouseID int64
+			if err := rows.Scan(&rawID, &b.ProductID, &rawWarehouseID, &b.OnHandQty, &b.ReservedQty,
+				&b.AvailableQty, &b.Version); err != nil {
+				return err
+			}
+			b.WarehouseID = strconv.FormatInt(rawWarehouseID, 10)
+			if len(out.Balances) == limit {
+				out.NextCursor = encodeIDCursor(lastID)
+				break
+			}
+			out.Balances = append(out.Balances, &b)
+			lastID = rawID
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}

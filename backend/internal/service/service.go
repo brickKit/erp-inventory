@@ -31,12 +31,17 @@ func (s *Service) allowedWarehouseIDs(ctx context.Context) ([]int64, error) {
 var ErrInvalidArgument = errors.New("参数不合法")
 
 type Service struct {
-	repo   *repo.Repo
-	logger *slog.Logger
+	repo              *repo.Repo
+	logger            *slog.Logger
+	lowStockThreshold string
 }
 
-func New(r *repo.Repo, logger *slog.Logger) *Service {
-	return &Service{repo: r, logger: logger}
+func New(r *repo.Repo, logger *slog.Logger, opts ...Option) *Service {
+	s := &Service{repo: r, logger: logger, lowStockThreshold: DefaultLowStockThreshold}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func validateQty(field, s string, allowNegative bool) error {

@@ -6,6 +6,7 @@ package module
 
 import (
 	"context"
+	"fmt"
 
 	besdk "github.com/brickKit/be-sdk-go"
 	inventoryv1 "github.com/brickKit/erp-inventory/gen/erp/inventory/v1"
@@ -27,8 +28,14 @@ func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
 	role := schema + "_rw"
 
 	// ⚠️ 池从 rt.DB 来，不许自己 sql.Open（§13.3 铁律二）。
+	threshold, err := lowStockThreshold(rt.Config)
+	if err != nil {
+		return nil, err
+	}
+	rt.Logger.Info("低库存阈值", "LOW_STOCK_THRESHOLD", threshold)
+
 	r := repo.New(rt.DB, role, schema)
-	svc := service.New(r, rt.Logger)
+	svc := service.New(r, rt.Logger, service.WithLowStockThreshold(threshold))
 
 	// HTTP：engine 必须用 besdk.NewGinEngine，它已挂好 OTel / request-id /
 	// error→status / PII 脱敏日志 / RED 指标 / /healthz / /metrics。
@@ -64,4 +71,17 @@ func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
 		},
 		Stop: func(ctx context.Context) error { return nil }, // 后台循环靠 ctx 退出
 	}, nil
+}
+
+// lowStockThreshold 读 LOW_STOCK_THRESHOLD：没配或空串用默认值；配了非法值返回
+// 错误让模块启动失败，而不是悄悄退回默认值跑。
+func lowStockThreshold(cfg besdk.Config) (string, error) {
+	v := cfg.StringOr("LOW_STOCK_THRESHOLD", "")
+	if v == "" {
+		return service.DefaultLowStockThreshold, nil
+	}
+	if err := service.ValidateLowStockThreshold(v); err != nil {
+		return "", fmt.Errorf("配置项 LOW_STOCK_THRESHOLD：%w", err)
+	}
+	return v, nil
 }
