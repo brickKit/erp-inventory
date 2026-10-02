@@ -6,8 +6,10 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -121,13 +123,40 @@ func toMovementDTO(m *repo.Movement) gin.H {
 	}
 }
 
+// parseListMovementsInput 读 GET /movements 的查询参数。created_after /
+// created_before 是 RFC 3339 时间，不传就由 repo 补默认窗口；格式不对返回错误
+// （handler 回 400），不悄悄忽略。
+func parseListMovementsInput(c *gin.Context) (repo.ListInput, error) {
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+	in := repo.ListInput{
+		Cursor: c.Query("cursor"), PageSize: pageSize,
+		ProductID: c.Query("product_id"), WarehouseID: c.Query("warehouse_id"),
+	}
+	for _, p := range []struct {
+		name string
+		dst  *time.Time
+	}{{"created_after", &in.CreatedAfter}, {"created_before", &in.CreatedBefore}} {
+		raw := c.Query(p.name)
+		if raw == "" {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return in, fmt.Errorf("%s 不是 RFC 3339 时间：%q", p.name, raw)
+		}
+		*p.dst = t
+	}
+	return in, nil
+}
+
 func listMovementsHandler(svc *service.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		pageSize, _ := strconv.Atoi(c.Query("page_size"))
-		out, err := svc.ListMovements(c.Request.Context(), repo.ListInput{
-			Cursor: c.Query("cursor"), PageSize: pageSize,
-			ProductID: c.Query("product_id"), WarehouseID: c.Query("warehouse_id"),
-		})
+		in, err := parseListMovementsInput(c)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		out, err := svc.ListMovements(c.Request.Context(), in)
 		if err != nil {
 			_ = c.Error(service.ToStatus(err))
 			return
