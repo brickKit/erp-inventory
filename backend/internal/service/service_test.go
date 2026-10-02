@@ -13,7 +13,7 @@ import (
 	"time"
 
 	besdk "github.com/brickKit/be-sdk-go"
-	"github.com/brickKit/erp-inventory/backend/internal/repo"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 

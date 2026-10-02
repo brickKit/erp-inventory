@@ -2,80 +2,11 @@ apiVersion: brickkit/v1
 kind: Component
 
 metadata:
-  id: erp/inventory                  # ⚠️ Fork 件必须与标准件完全一致（§3.4.1）
-  name: 库存管理
-  version: 1.0.18                    # 精确版本，不接受 ^ / ~ / latest
-                                     # v1.0.18：scripts/seed.sh 改成 source infra/scripts/lib/seed-net.sh——除了 component_version/service_name/网络检查外，这次还把工具箱容器+curl 包装、Casdoor 登录、JWT 换取、sub_of 查询这几段也换成共享库的 with_toolbox/get_app_jwt/sub_of，本组件自己反查 mdm-product 种子产品 id 的 real_product_id 也改用共享库的 idfor。理由同 docs/dev/架构复盘-servedBy落地后的自有改进空间.md 发现一。真机跑通 make seed（自造 4 个产品覆盖四种流水原因+在途预留，另探测到 mdm-product 12 个真实产品各灌 200 件库存），无业务行为/契约变更。
-                                     # v1.0.17：同 mdm/customer 这次改动，scripts/seed.sh 里既有 docker ps 容器名发现（gRPC 直连 Reserve/ConfirmIssue）又有宿主机 localhost 端口假设（REST 调用 + Casdoor/infra-iam-casdoor 换 JWT）两类坑，一并修复：gRPC 目标地址改用 ServiceName() 规则拼；REST 调用改成起一次性工具箱容器加入 brickkit 网络内部访问，不再假设任何组件把端口发布到宿主机。真机在 servedBy 部署下跑通 make seed（含①自成一体演示数据、②探测 mdm-product 灌真实库存两步）。无业务行为/契约变更。
-                                     # v1.0.16：同 mdm/customer 这次改动，删掉 deployment.labels 的 prometheus.io/port，理由同上。无业务行为/契约变更。
-                                     # v1.0.15：import-scan 门禁提前补上铁律六第二类白名单，理由同 erp/finance 这次改动（设计书§13.3）。本组件目前没有任何代码实际用到这条豁免，无行为变更。
-                                     # v1.0.14：gen/erp/inventory 拆成独立嵌套 go module，理由与做法同 erp/finance 这次改动（阶段四调研记录 04 §13）。本仓库自己 standalone 构建/测试用本地 replace 完全不受影响，import-scan/单测全绿。无业务行为/契约变更。
-                                      # v1.0.13：消费者测试改用测试私有 subject
-                                      # （`testSubject()`），不再直接订阅/发布生产 subject
-                                      # 字面量——04-testing-standard.md §3.4 第一条要求，
-                                      # 系统排查测试完整性时发现全项目只有 infra-notification
-                                      # 落地过这条，本组件与 erp-finance/erp-sales/
-                                      # integration-im-dingtalk 同一批补齐（field-tested-
-                                      # pitfalls-log.md 类别 E 的 E2）。纯测试基础设施修复，
-                                      # 无行为/契约变更。
-                                      # v1.0.12：补 TestProperty_库存三大不变式/
-                                      # TestProperty_Reserve并发同key仅执行一次——
-                                      # 04-testing-standard.md §3.2 对"核心交易类组件"
-                                      # 的强制要求（L2 必须用属性测试，例子测试不够），
-                                      # 全项目系统排查测试完整性时发现三个核心交易类
-                                      # 组件（本组件/erp-finance/erp-sales）从建组件起
-                                      # 就没写过一个属性测试，此次补齐。用 rapid 随机
-                                      # 生成 Receive/Reserve/ConfirmIssue/
-                                      # CancelReservation/Adjust 操作序列攻击同一个
-                                      # (product,warehouse)，验证"on_hand 永不为负/
-                                      # reserved 永不为负/available 永不为负"三条不变式；
-                                      # 并补上此前从没测过的"并发同 key 只执行一次"
-                                      # （已有的 TestReserve_并发防超卖 测的是"不同 key
-                                      # 抢同一批库存"，不是这条）。纯补测试，无行为/
-                                      # 契约变更。
-                                      # v1.0.11：补齐 README.md 的"怎么起来"/"怎么用"/
-                                      # "配置项"三节——建仓库时留的占位符一直没人回来
-                                      # 填，`make docs-check` 的占位符检测正则同时修正
-                                      # （原来只查 TBD/TODO/待补，没覆盖实际用的"后补"
-                                      # 措辞）。纯文档，无行为/契约变更。
-                                      # v1.0.10：make seed 探测 mdm-product 种子数据那
-                                      # 一步的循环范围从 1 2 3 4 改成
-                                      # 1 2 3 4 5 6 7 8 9 10 11 12——mdm-product 这一轮
-                                      # 扩到 12 个种子产品后，旧范围让 crm-opportunity
-                                      # 新增的第二条 WON 商机（用第 7 号产品）赢单时
-                                      # Reserve 真的找不到库存、走了一次 TCC 补偿建
-                                      # 异常待办（不是 bug，是"下游可以、也应该倒逼
-                                      # 上游丰富数据"这条 SOP-W-7 判据第一次真实
-                                      # 触发），记入踩坑记录 C24。无破坏性变更。
-                                      # v1.0.9：scripts/seed.sh 探测式关联 mdm-product
-                                      # 那一步的 idempotency_key 从位置编号改成真实产品
-                                      # id（`seed-inv-recv-real-$PID`）——固定编号在
-                                      # mdm-product 被 seed-clean 后产品 id 轮换时会
-                                      # 静默绑死旧 id，新 id 永远拿不到库存，真机走两轮
-                                      # clean/reseed 循环时复现（实测踩坑记录 C22）
-                                      # v1.0.8：新增 make seed/db-reset（总纲 SOP-W-7，
-                                      # 自成一体假数据 + 探测 mdm-product 顺手灌真实
-                                      # 产品库存，取代 infra/seed-data 里原来的裸 SQL
-                                      # 步骤）；顺带修了一个真实 bug——
-                                      # 003_seed_warehouses.down.sql 的 DELETE 在
-                                      # migrate down 倒序执行时（004→001）会撞上
-                                      # inventory_balances 的外键（001 的 down 还没跑到，
-                                      # 表还在），这条路径此前从未被真机跑过，`make
-                                      # db-reset` 第一次真跑就复现，改成留空（001 的
-                                      # down 本来就会整表一起删）
-                                      # v1.0.7：docs/手册.md 的 TEST_PG_DSN 示例改指向
-                                      # brickkit_test_db（测试库与演示库分开，见根
-                                      # AGENTS.md），纯文档，无行为/契约变更
-                                      # v1.0.4：纯重新构建，deployment.image 之前一直
-                                      # 停在 1.0.2，v1.0.3 的源码改动从没真的打进镜像
-                                      # 过（阶段三 Task 4 核对 brickkit up 真机时发现）
-                                      # v1.0.6：升级 be-sdk-go 到 v0.2.4——gRPC server 加
-                                      # panic-recovery 拦截器，修真机测试发现的严重问题：
-                                      # Receive/Adjust/GetBalance/ListMovements 四个
-                                      # REST-only 方法被 gRPC 直连（ctx 无 Claims）会
-                                      # panic 崩掉整个容器（docs/dev/实测踩坑记录.md C11），
-                                      # 无破坏性变更
-  description: 库存余额、流水、预留、防超卖判定——物理命令枢纽
+  id: erp/inventory
+  name: Inventory
+  version: 2.0.0
+  description: Stock balances, movements and reservations, with oversell protection; the only writer of physical stock movements.
+  repository: https://github.com/brickKit/erp-inventory
   license: Apache-2.0
   vendor: brickKit
 
@@ -84,68 +15,51 @@ tags: [erp, inventory, warehouse]
 artifacts:
   - type: api-contract
     format: protobuf
-    files:
-      - contracts/erp/inventory/v1/inventory.proto
-      - contracts/events/inventory.events.json
+    files: [contracts/erp/inventory/v1/inventory.proto, contracts/events/inventory.events.json]
   - type: api-contract
     format: openapi
     files: [contracts/inventory.openapi.yaml]
-  - type: metadata                   # ← assembly.yaml 靠这一条随组件分发（§3.5）
+  - type: metadata
     files: [assembly.yaml]
 
 dependencies:
-  components: []                     # ⚠️ 本组件是物理命令枢纽，零出边（设计计划 §5、§6）。
-                                      # 尤其不依赖 mdm/product——product_id 是不透明外键，
-                                      # 校验产品存在是调用方（erp-sales）的事
-  resources:
-    # ⚠️ engine 逐字参与匹配（设计书 §2.7.3.1）：这里写的词必须与
-    #    brickkit.yaml 的 resources[].engine 完全相同，平台不认别名。
-    - { kind: database, engine: postgresql }   # 产品名：不在替换范围
-    - { kind: mq,       engine: nats }         # 产品名：换 Kafka 是一次迁移，要让平台阻断
+  components: []
 
 configSchema:
   type: object
   properties:
-    pgSchema:                        # ⚠️ 不能叫 databaseSchema，DATABASE_ 是保留前缀
-      type: string
-      default: erp_inventory
-    iamJwksUrl:                      # JWT 本地验签的公钥来源。不对 IAM 建依赖边（决策 87）
-      type: string
-    authzBundleUrl:                  # 阶段三 Task 6：功能权限判定的 bundle 轮询地址，
-                                      # 指向 infra-authz。不建依赖边（同 iamJwksUrl 的
-                                      # 判据，设计书 §14.1.4）
-      type: string
-    otelBaseUrl:                     # ⚠️ 不能叫 otelEndpoint，*_ENDPOINT 是保留后缀
-      type: string
-      default: ""                    # 空 → Blackhole Exporter，零成本（§7.5）
-    # ⚠️ 没有 defaultPageSize/listWindowDays：踩过 mdm-customer 的坑，
-    # List 的默认页大小/时间窗口实际上是 besdk.ListWindow 的包级常量，
-    # 写在这里只会让人以为能配实际不能配。
+    PG_HOST: {type: string}
+    PG_PORT: {type: string, default: "5432"}
+    PG_DATABASE: {type: string}
+    PG_USER: {type: string}
+    PG_PASSWORD: {type: string, secret: true}
+    PG_SCHEMA: {type: string, default: erp_inventory}
+    NATS_URL: {type: string}
+    OTEL_BASE_URL: {type: string, default: ""}
+    AUTHZ_BUNDLE_URL: {type: string}
+    IAM_JWKS_URL: {type: string}
+    LOW_STOCK_THRESHOLD: {type: string, default: "10"}
+  required: [PG_HOST, PG_DATABASE, PG_USER, PG_PASSWORD, NATS_URL, AUTHZ_BUNDLE_URL, IAM_JWKS_URL]
 
 deployment:
   type: container
-  image: brickenterprise/erp-inventory:1.0.18
-  port: 8086                         # 端口册 registry/ports.tsv
+  build: {context: ., dockerfile: Dockerfile}
+  port: 8086
   extraPorts:
-    - { name: grpc, port: 9096 }     # → ERP_INVENTORY_GRPC_ENDPOINT（值仍以 http:// 开头）
-  labels:                            # 平台只搬运，不解释键值。值必须是字符串
+    - {name: grpc, port: 9096}
+  labels:
     prometheus.io/scrape: "true"
-    # prometheus.io/port 原来写在这里——阶段四附加 Task 0.1 真机验证
-    # servedBy 时发现这个标签会跟同外壳其它成员的 prometheus.io/port 撞车
-    # 报错（每个组件的值天然不同，servedBy 的 labels 合并规则没有像 env
-    # 变量合并那样排除这类"语义上必然因组件而异"的标签，已反馈给 brickKit，
-    # 见装配仓库 docs/dev/brickKit反馈-servedBy的labels合并漏了排除规则.md）。
-    # 在 brickKit 修复或给出结论之前，暂时从这里删掉，只在合并后的外壳
-    # 自己的条目上保留一份——跟"合并后指标只能走一个共享抓取端口"这个
-    # 事实本来就一致，不是单纯绕过。
-    prometheus.io/path: "/metrics"
+    prometheus.io/path: /metrics
   resources:
-    requests: { cpu: "200m", memory: "256Mi" }  # 写并发最高的组件，起点比只读枢纽高一档
+    requests: {cpu: 200m, memory: 256Mi}
 
 migration:
-  command: ["./migrate", "up"]
+  command: [./migrate, up]
 
 healthCheck:
   type: http
-  path: /healthz                     # ⚠️ 只查本进程存活，严禁查库或查依赖组件（§12.3.6）
-  # startPeriodSeconds 不写：默认就是 60，Go 组件够用（§12.3.5）
+  path: /healthz
+
+local:
+  language: go
+  runCommand: [go, run, ./backend/cmd/server]

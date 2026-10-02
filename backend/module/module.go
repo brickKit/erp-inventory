@@ -11,20 +11,19 @@ import (
 	inventoryv1 "github.com/brickKit/erp-inventory/gen/erp/inventory/v1"
 	"google.golang.org/grpc"
 
-	"github.com/brickKit/erp-inventory/backend/internal/consumer"
-	grpcapi "github.com/brickKit/erp-inventory/backend/internal/grpc"
-	httpapi "github.com/brickKit/erp-inventory/backend/internal/http"
-	"github.com/brickKit/erp-inventory/backend/internal/partition"
-	"github.com/brickKit/erp-inventory/backend/internal/repo"
-	"github.com/brickKit/erp-inventory/backend/internal/service"
-	"github.com/brickKit/erp-inventory/migrations"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/consumer"
+	grpcapi "github.com/brickKit/erp-inventory/v2/backend/internal/grpc"
+	httpapi "github.com/brickKit/erp-inventory/v2/backend/internal/http"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/partition"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/service"
 )
 
 // New 构造 erp-inventory 模块。签名一个字都不许改（§12.5.1）——62 个
 // 组件都是这一个签名，外壳启动器与 be-ops 产出 4 都按它生成。
 func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
 	// ⚠️ 配置只从 rt.Config 来，模块里零 os.Getenv（§12.5.3、决策 110）。
-	schema := rt.Config.StringOr("pgSchema", "erp_inventory")
+	schema := rt.Config.StringOr("PG_SCHEMA", "erp_inventory")
 	role := schema + "_rw"
 
 	// ⚠️ 池从 rt.DB 来，不许自己 sql.Open（§13.3 铁律二）。
@@ -44,8 +43,6 @@ func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
 		RegisterGRPC: func(gs *grpc.Server) {
 			inventoryv1.RegisterInventoryServiceServer(gs, grpcapi.New(svc))
 		},
-
-		Migrations: migrations.FS, // 合并态由外壳按拓扑顺序跑（§13.3 铁律五）
 
 		// 后台循环：Outbox 推送 + 周分区维护（event_outbox/event_inbox）+
 		// 月分区维护（inventory_movements）+ 消费 mdm.product 事件维护

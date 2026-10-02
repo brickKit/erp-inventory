@@ -19,7 +19,7 @@ import (
 	besdk "github.com/brickKit/be-sdk-go"
 	"github.com/nats-io/nats.go"
 
-	"github.com/brickKit/erp-inventory/backend/internal/repo"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
 )
 
 // productPayload 只取 tracking_type——mdm.product.created.v1/.updated.v1

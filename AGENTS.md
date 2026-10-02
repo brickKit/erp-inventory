@@ -1,67 +1,40 @@
-# erp-inventory · AI 助手导读
+[English](AGENTS.md) · [中文](AGENTS.zh.md)
 
-## 身份证
+# erp/inventory
 
-| 项 | 值 |
-|---|---|
-| 组件 ID | `erp/inventory` |
-| 仓库名 | `erp-inventory` |
-| 端口 | HTTP `8086` / gRPC `9096`（`registry/ports.tsv`，装配仓库根目录那份） |
-| schema / role | `erp_inventory` / `erp_inventory_rw`（归档 schema `erp_inventory_archive`，**本组件真的会用**，见设计计划 §7） |
-| 语言 / 框架 | Go：Gin + `database/sql` + `pgx/v5/stdlib` + `sqlc` + `golang-migrate` |
-| 合并部署时进 | 外壳一 `go-core` |
-| 装配角色 | `default` |
-| 设计真相源 | 装配仓库 `docs/design/erp-inventory.md`——本文件与它冲突时，以那份为准，回来改这里 |
+The AI guide to developing this component. How to use it, its boundaries and contracts: BRICKKIT.md. Dependencies, configuration and deployment: component.yaml.
 
-## 边界
+## Code map
 
-**归我：** 库存余额、库存流水、库位/仓库、库存预留、防超卖判定——"这批货现在还有没有、能不能占"这个问题的唯一真相源（设计书 §2.6 物理命令枢纽）。
+<!-- TODO: two tables — "Path / Owns" (paths in backticks, directories ending in /) and "Feature / Start here / Then"; brickkit lint checks every path exists -->
 
-**不归我：**
-- 产品是什么（SKU、名称、单位、要不要按批次管）：归 `mdm-product`。本组件只持有 `tracking_type` 的**摘要副本**
-- 为什么要出这批货（订单、生产工单）：归 `erp-sales`/`erp-manufacturing`。本组件收到的是"占 N 件"这个命令，不关心背后是哪张单
-- 存货的**会计价值**、成本核算：归 `erp-finance`。本组件只发数量变动事件，不算金额
+## Build and test
 
-`data_scopes` 声明 `warehouse` 维（设计书 §14.2.2）——分仓管理的客户里，华东仓管理员不该看到华南仓库存明细。`warehouse_id` 本来就是业务主键的一部分，不需要额外的数据权限列。
+<!-- TODO: the exact commands to build, test, run locally and check the contract, and what success looks like -->
 
-## 契约面与事件
+## Design decisions
 
-**gRPC `erp.inventory.v1.InventoryService`：** `Reserve`/`CancelReservation`/`ConfirmIssue`（TCC 三件套，命令）、`Receive`/`Adjust`（入库/调整，命令）、`GetReservationStatus`/`GetBalance`/`BatchGetBalance`/`ListMovements`（读）。`BatchGetBalance` 是防 N+1 的唯一合法调用方式，任何时候都不许删掉它只留 `GetBalance`。
+<!-- TODO: why it does not depend on some other component; alternatives rejected and why — longer reasoning goes in docs/ and is linked here -->
 
-**REST 前缀：** `/erp/inventory/**`，只暴露 `Receive`/`Adjust`/`GetBalance`/`BatchGetBalance`/`ListMovements`。**`Reserve`/`CancelReservation`/`ConfirmIssue`/`GetReservationStatus` 永远不暴露到 REST**——它们是组件间 TCC 协议的一部分，不是人类操作。
+## Pitfalls
 
-**发布事件：** `erp.inventory.adjusted.v1`（`Receive`/`ConfirmIssue`/`Adjust` 都发这条）、`erp.inventory.transferred.v1`（占位，阶段二不实现）。`erp-finance` 消费它生成存货凭证，payload 只带数量不算金额。
+<!-- TODO: a table: Never / Symptom / Why — only what is specific to this component; project-wide rules stay in the project's AGENTS.md -->
 
-**消费事件：** `mdm.product.created.v1`/`.updated.v1`——只取 `tracking_type` 维护摘要副本（`product_tracking_snapshots`）。
+## Before changing code
 
-## 依赖与「为什么不依赖某某」
+<!-- TODO: 3 to 8 checks to run before changing code here -->
 
-`dependencies.components` 永远是空数组。
+<!-- brickkit:managed:begin lang=en -->
+<!-- maintained by brickkit (init, add, remove, upgrade, skills update): edits between these markers are overwritten -->
 
-- **不依赖 `mdm-product`**：反直觉但重要——`product_id` 对本组件是不透明外键，校验产品存不存在是调用方（`erp-sales`）的事，它在调 `Reserve` 之前已经校验过了。`tracking_type` 走事件摘要副本，不走同步调用（设计计划 §5）。
-- **不依赖 `erp-sales`/`erp-finance`**：本组件是被调用方与事件发布方，没有任何出边（§2.6）。
-- **不依赖 `infra-iam-casdoor`**：IAM 走 JWT 本地验签（决策 87），只需要 `iamJwksUrl` 拉公钥。
+## BrickKit
 
-## 这个组件特有的坑
+This is a BrickKit component: `component.yaml` is all the platform reads. The rules it relies on:
 
-| 不许 | 症状 | 出处 |
-|---|---|---|
-| 给 `dependencies.components` 加任何一条（尤其是 `mdm-product`） | 编译、启动、测试全都正常——**没有任何症状**。但物理命令枢纽从此有了出边，同步图迟早成环 | §2.6、设计计划 §5 |
-| 防超卖用"先 SELECT 查够不够，再 UPDATE 扣" | 单元测试永远绿，压测偶尔红，生产上一天错几单——中间有窗口。必须用条件更新（`WHERE on_hand_qty - reserved_qty >= $1`），判定与加锁是同一条语句 | 设计计划 §2.2 |
-| `(product_id, warehouse_id)` 上不建唯一约束 | 建表能过、迁移能跑——但并发下会产生重复的余额行（Odoo 的 `stock.quant` 就是这么踩的坑，靠事后合并清理，且清理逻辑本身有 bug） | 设计计划 §2.2、§8 |
-| 补录过去日期的出入库，改历史流水行 | ERPNext 的 repost 机制就是这么做的，代价是两把 advisory lock + 检查点文件 + 无界级联。本组件流水真的只增不改，补录用冲销流水 | 设计计划 §2.1 |
-| `GetReservationStatus` 把 `NOT_FOUND` 与 `CANCELLED` 合并成一个"没有" | 上游超时重试时会误判——`NOT_FOUND` 说明请求根本没到（能安全重试），`CANCELLED` 说明已被撤销（不能重试）。合并成一个会导致误杀或漏杀 | 设计计划 §3、§4.5 |
-| `inventory_balances` 加分区或归档 | §11.2.5 明确注明它必须永远小而快——它是全系统写并发最高的表，分区会让防超卖那条条件更新跨分区找行 | 设计计划 §7 |
-| 5 个写命令（`Reserve`/`CancelReservation`/`ConfirmIssue`/`Receive`/`Adjust`）的幂等用"先查 `command_idempotency`、查不到再插入"（mdm-product 的写法） | 单机测试永远绿——两个带同一个 `idempotency_key` 的并发请求都可能在"查不到"的窗口里各自跑一遍真正的工作，Reserve 场景下就是重复预留。必须先原子 `INSERT ... ON CONFLICT (idempotency_key) DO NOTHING` 声明（声明失败就等，查它落地的结果），声明成功才做真正的写 | `backend/internal/repo/repo.go` 的 `claimIdempotency`；设计计划 §9 |
-| 给 `inventory_movements` 的月分区起名时不看 `backend/internal/partition/monthly.go` 里 `ensurePartition` 用的格式（`表名_YYYY_MM_01`），自己拍脑袋写个别的格式（如 `表名_YYYY_MM`） | 迁移能跑通、组件能启动——但后台分区维护任务的 `to_regclass` 查不到已存在的分区，会尝试新建同一时间范围的分区，撞上 PostgreSQL"分区范围不许重叠"报错，且只在维护任务下一次检查时才炸 | 设计计划 §9 第 8 条 |
-| 往 `backend/internal/consumer` 或任何调 `besdk.Consume` 的地方传错 `role`，或以为它像旧版一样不需要 `role` | `be-sdk-go` v0.1.8 前 `Consume` 给 `fn` 的 `tx` 没切过 role/search_path，业务代码按 `WithTx` 约定写的"不带 schema 前缀"SQL 会报表不存在。**v0.1.8 起已修**，但如果哪天又有人手滑传错 role 字符串，症状是"SET LOCAL ROLE" 报错，不是静默的 | `be-sdk-go` v0.1.8 CHANGELOG；`backend/internal/consumer/consumer.go` |
-
-## 改代码前的自查
-
-1. **我是不是在给这个组件加一条 `dependencies.components`？** 停下——尤其是 `mdm-product`，几乎总是不必要（见上表第一条）。
-2. **我写的这段防超卖逻辑，判定条件是不是写在 SQL 的 `WHERE` 里？** 如果是"先查后写"两条语句，就是错的，无论查得多近。
-3. **我是不是在给 `inventory_balances` 加列做分区/归档？** 停下——设计计划 §7 已经判定它永不分区永不归档，除非设计计划本身先改。
-4. **这个改动会不会让 `contracts/inventory.proto` 出现破坏性变更？** 下游 `erp-sales`/`erp-purchase`/`erp-manufacturing` 都消费这份契约，只能向后兼容地追加（§3.4 铁律 3）。
-5. **我是不是在改 `inventory_movements` 里已经写入的历史行？** 停下——流水只增不改，补录用冲销流水，不改写过去。
-6. **我新加的写命令，幂等是不是走"先查后插"？** 停下——本组件的写命令必须走 claim-first（先原子声明 `command_idempotency`，声明成功才做真正的工作），理由见上表。
-7. **我是不是在给一张新的表加"迁移建初始分区 + 后台任务建后续分区"？** 两处的分区命名必须共用同一个格式/同一段代码，不能分别手写。
+- `configSchema` keys are the environment variable names the code reads. Never use a reserved name: `COMPONENT_ID`, `COMPONENT_VERSION`, `PORT`, `BRICKKIT_SERVED_MEMBERS`, `BRICKKIT_SERVED_MEMBERS_CONFIG`, or any `*_ENDPOINT`.
+- Dependencies are exact versions. A dependency's address arrives as `<ID>_ENDPOINT`; an optional dependency that is absent has no variable at all, so read it with a fallback.
+- `/healthz` checks only this process, never a dependency. The migration command runs from the same image and must fail on an argument it does not know.
+- `BRICKKIT.md` travels to every project that uses this component and is read there without the repository: keep it in step with the code, with no relative links.
+- Release: raise `metadata.version`, commit, push, `brickkit release`. `brickkit lint` checks the manifest and these docs — inside a project, run in this directory, it checks only this component (`--all` for the whole project).
+- The full rules are in the `brickkit-component` skill (`.claude/skills/brickkit-component/SKILL.md` at the root of the project or repository where skills are installed; `brickkit skills update` installs it); for flags ask `brickkit <command> --help`; BrickKit's own documentation is `brickkit docs`.
+<!-- brickkit:managed:end -->

@@ -9,8 +9,8 @@ import (
 
 	inventoryv1 "github.com/brickKit/erp-inventory/gen/erp/inventory/v1"
 
-	"github.com/brickKit/erp-inventory/backend/internal/repo"
-	"github.com/brickKit/erp-inventory/backend/internal/service"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/service"
 )
 
 type server struct {

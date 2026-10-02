@@ -12,7 +12,7 @@ import (
 	"strconv"
 
 	besdk "github.com/brickKit/be-sdk-go"
-	"github.com/brickKit/erp-inventory/backend/internal/repo"
+	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
 )
 
 // allowedWarehouseIDs 是 Receive/Adjust/GetBalance/ListMovements 四个
