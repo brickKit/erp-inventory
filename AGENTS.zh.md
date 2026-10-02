@@ -65,6 +65,7 @@ PG_HOST=localhost PG_PORT=5432 PG_DATABASE=brickkit_test_db PG_USER=erp_inventor
 - **仓库范围来自本组件自己的表**，不来自 token：service 用调用者的 `sub` 查 `warehouse_access`，把列表下推进每条查询的 `WHERE`。
 - **列表是静态 SQL**，"参数为空就不限"；余额按 `id` 分页、没有时间窗口，流水按 `created_at` + `id` 分页、默认 90 天窗口。
 - **低库存阈值是十进制字符串，在 SQL 里比较**，启动时读一次；非法值让组件启动失败。
+- **数量是严格的十进制字符串**：`validateQty` 只认 `^-?[0-9]{1,12}(\.[0-9]{1,6})?$`（与 `NUMERIC(18,6)` 对齐），符号与是否为 0 按字符串判断，从不经过浮点数。
 
 ## 易错点
 
@@ -73,6 +74,7 @@ PG_HOST=localhost PG_PORT=5432 PG_DATABASE=brickkit_test_db PG_USER=erp_inventor
 | 先 `SELECT` 查够不够再 `UPDATE` | 单元测试永远绿，压测偶尔红，生产上一天超卖几单 | 两条语句之间有窗口；条件必须写在 `UPDATE` 的 `WHERE` 里 |
 | 给 `dependencies.components` 加一条，尤其是 `mdm/product` | 什么都不坏；枢纽不再是调用图的叶子，下一条边就可能成环 | 调用方预留之前已校验产品；追踪方式经事件到达 |
 | 查询之后在 Go 里按可见仓库过滤 | 一页条数不够甚至是空页，`next_cursor` 却还在 | 可见仓库列表必须是 SQL `WHERE` 的一部分 |
+| 用 `strconv.ParseFloat` 校验数量 | `"NaN"` 能过、存进 `NUMERIC`，这一行余额从此可以无限超卖；`"Inf"` 是 500 | PostgreSQL 里 `NaN` 排在所有数之上，`CHECK` 与防超卖的 `WHERE` 对它恒真；用 `validateQty` |
 | 把空的可见仓库列表当成"不限" | 一个仓库都没授的用户看到全部仓库 | `= ANY('{}')` 什么都匹配不到，这正是想要的失败关闭 |
 | 迁移里给 `inventory_movements` 新分区起的名字与 `ensurePartition` 不同（`<表>_YYYY_MM_01`） | 迁移能过；维护循环之后想建一个范围重叠的分区而失败 | `to_regclass` 按这个确切名字查分区 |
 | 在 `GetReservationStatus` 里把 `NOT_FOUND` 与 `CANCELLED` 合并 | 上游超时重试时要么重复预留，要么错误地放弃 | `NOT_FOUND` 是请求根本没到（可以安全重试），`CANCELLED` 是到了且已撤销 |

@@ -21,7 +21,7 @@
 
 ## 部署前准备
 
-- **PostgreSQL**：schema `erp_inventory` 与 `erp_inventory_archive`。登录角色 `erp_inventory_rw`，在两个 schema 上都有 `USAGE` 与 `CREATE`，以及它的密码。迁移以这个角色运行并建表，所以表归它所有；运行中的组件会自己给 `inventory_movements` 建月分区、给 `event_outbox` / `event_inbox` 建周分区，这需要表的所有权。迁移同时建好两个播种仓库。brickKit 不建这些；在 BrickEnterprise 装配项目里，`make dev-env` 把密码写进 `.env`，`make db-init` 建 schema、角色与授权。
+- **PostgreSQL**：schema `erp_inventory`；如果你的 schema 约定会建 `erp_inventory_archive` 也可以建（本组件从不写它）。登录角色 `erp_inventory_rw`，在 `erp_inventory` 上有 `USAGE` 与 `CREATE`，以及它的密码。迁移以这个角色运行并建表，所以表归它所有；运行中的组件会自己给 `inventory_movements` 建月分区、给 `event_outbox` / `event_inbox` 建周分区，这需要表的所有权。迁移同时建好两个播种仓库。brickKit 不建这些；在 BrickEnterprise 装配项目里，`make dev-env` 把密码写进 `.env`，`make db-init` 建 schema、角色与授权。
 - **NATS** 可经 `NATS_URL` 访问：组件经 Outbox 表与后台循环发布事件，并消费 `mdm.product.created.v1` / `mdm.product.updated.v1`。NATS 不可达时组件照常启动，事件留在 Outbox 里等待。
 - **权限**（`infra/authz`）与**身份**（`infra/iam-casdoor`，或任何提供 JWKS 的 IAM）可经 `AUTHZ_BUNDLE_URL`、`IAM_JWKS_URL` 访问，REST 路由才会返回错误以外的结果。它们是配置不是依赖：没有它们组件照样启动。
 - **仓库授权**：用户只能看到、只能变动授给自己的仓库里的库存。用 `POST /erp/inventory/warehouse-access/{sub}`（权限 `erp.inventory.manage_access`）授予；一个仓库都没授的用户看不到任何仓库、余额与流水。

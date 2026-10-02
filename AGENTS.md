@@ -65,6 +65,7 @@ PG_HOST=localhost PG_PORT=5432 PG_DATABASE=brickkit_test_db PG_USER=erp_inventor
 - **Warehouse scope comes from this component's own table**, not from the token: the service looks up the caller's `sub` in `warehouse_access` and pushes the list into every query's `WHERE`.
 - **Lists are static SQL** with "empty parameter means no filter"; balances page by `id` with no time window, movements by `created_at` + `id` with the default 90-day window.
 - **The low-stock threshold is a decimal string compared in SQL**, read once at start-up; an invalid value stops the component.
+- **Quantities are strict decimal strings**: `validateQty` accepts only `^-?[0-9]{1,12}(\.[0-9]{1,6})?$` (matching `NUMERIC(18,6)`) and judges sign and zero on the string, never through a float.
 
 ## Pitfalls
 
@@ -73,6 +74,7 @@ PG_HOST=localhost PG_PORT=5432 PG_DATABASE=brickkit_test_db PG_USER=erp_inventor
 | Check stock with a `SELECT` and then `UPDATE` | Unit tests stay green, a load test fails now and then, production oversells a few orders a day | There is a window between the two statements; the condition must be in the `UPDATE`'s `WHERE` |
 | Add an entry to `dependencies.components`, especially `mdm/product` | Nothing breaks; the hub stops being a leaf of the call graph and the next edge can close a cycle | Callers validate products before reserving; tracking types come by event |
 | Filter by allowed warehouses in Go after the query | Pages come back short or empty while `next_cursor` is set | The allowed list must be part of the SQL `WHERE` |
+| Validate a quantity with `strconv.ParseFloat` | `"NaN"` passes, is stored in `NUMERIC`, and that balance row oversells without limit from then on; `"Inf"` is a 500 | `NaN` ranks above every number in PostgreSQL, so the `CHECK`s and the oversell `WHERE` are always true for it; use `validateQty` |
 | Treat an empty allowed list as "no filter" | A user with no grants sees every warehouse | `= ANY('{}')` matches nothing; that is the intended fail-closed result |
 | Name a new `inventory_movements` partition in a migration differently from `ensurePartition` (`<table>_YYYY_MM_01`) | Migrations pass; the maintenance loop later tries to create an overlapping partition and fails | `to_regclass` looks the partition up by that exact name |
 | Merge `NOT_FOUND` and `CANCELLED` in `GetReservationStatus` | An upstream retry after a timeout either double-reserves or wrongly gives up | `NOT_FOUND` means the request never landed (safe to retry); `CANCELLED` means it landed and was undone |
