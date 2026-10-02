@@ -5,9 +5,9 @@
 // ⚠️ 防超卖的判定与加锁是同一条 SQL 语句（条件 UPDATE）——这一层的正确性
 // 直接决定库存会不会真的被超卖。
 //
-// 文件分工：repo.go 放共用的错误、幂等声明与小工具；balance.go 读余额；
-// movement.go 写入库 / 调整并列流水；reservation.go 是 TCC 三件套；
-// access.go 管 warehouse_access。
+// 文件分工：repo.go 放共用的错误、幂等声明与小工具；balance.go 读余额（单条、
+// 批量、列表）；movement.go 写入库 / 调整并列流水；reservation.go 是 TCC 三件套；
+// stats.go 是仪表盘统计；warehouse.go 读仓库；access.go 管 warehouse_access。
 package repo
 
 import (
