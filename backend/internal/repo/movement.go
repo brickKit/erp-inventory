@@ -282,7 +282,7 @@ func (r *Repo) ListMovements(ctx context.Context, in ListInput) (*ListResult, er
 	if q.Cursor != "" {
 		ck, err := decodeCursor(q.Cursor)
 		if err != nil {
-			return nil, fmt.Errorf("非法 cursor：%w", err)
+			return nil, fmt.Errorf("%w: 非法 cursor：%v", ErrInvalidArgument, err)
 		}
 		cursorAt, cursorID = ck.CreatedAt, ck.ID
 	}
