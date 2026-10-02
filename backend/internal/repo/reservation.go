@@ -24,6 +24,10 @@ const (
 	StatusCancelled   = "CANCELLED"
 )
 
+// commandReserve 是 Reserve 写进 command_idempotency.command 的值；按幂等键查
+// 预留状态时只认它。
+const commandReserve = "Reserve"
+
 // ReserveItem 是 Reserve 的一个 (product, warehouse, qty) 项。
 type ReserveItem struct {
 	ProductID   string
@@ -47,7 +51,7 @@ func (r *Repo) Reserve(ctx context.Context, in ReserveInput) (string, error) {
 	}
 	var reservationID string
 	err := besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
-		claimed, err := claimIdempotency(ctx, tx, in.IdempotencyKey, "Reserve")
+		claimed, err := claimIdempotency(ctx, tx, in.IdempotencyKey, commandReserve)
 		if err != nil {
 			return err
 		}
@@ -370,14 +374,17 @@ func (r *Repo) GetReservationStatus(ctx context.Context, reservationID, idempote
 	err = besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
 		effectiveID := reservationID
 		if effectiveID == "" {
-			resolved, err := lookupIdempotencyResult(ctx, tx, idempotencyKey)
+			// 只认 Reserve 的键：别的命令（Receive / ConfirmIssue / …）的 result_id
+			// 不是 reservation_id，对状态查询来说就是"没有这个 Reserve"。
+			err := tx.QueryRowContext(ctx,
+				`SELECT result_id FROM command_idempotency WHERE idempotency_key = $1 AND command = $2`,
+				idempotencyKey, commandReserve).Scan(&effectiveID)
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil // 真正的 NOT_FOUND：所有返回值留零值
 			}
 			if err != nil {
-				return err
+				return fmt.Errorf("查 command_idempotency: %w", err)
 			}
-			effectiveID = resolved
 		}
 		_, current, oid, err := loadReservationGroup(ctx, tx, effectiveID, false)
 		if err != nil {
