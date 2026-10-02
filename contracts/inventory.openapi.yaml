@@ -168,6 +168,60 @@ paths:
                     items: { $ref: "#/components/schemas/Movement" }
                   next_cursor: { type: string }
 
+  /warehouse-access/{sub}:
+    parameters:
+      - name: sub
+        in: path
+        required: true
+        schema: { type: string }
+        description: 用户在 IAM 里的 sub
+    get:
+      summary: ListWarehouseAccess（这个用户被授权了哪些仓库，权限 erp.inventory.manage_access）
+      operationId: listWarehouseAccess
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  warehouse_ids:
+                    type: array
+                    items: { type: string }
+    post:
+      summary: GrantWarehouseAccess（授予一个仓库，幂等，权限 erp.inventory.manage_access）
+      operationId: grantWarehouseAccess
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [warehouse_id]
+              properties:
+                warehouse_id: { type: string, description: 仓库不存在时返回 400 }
+      responses:
+        "200":
+          description: OK（重复授予也是 200）
+
+  /warehouse-access/{sub}/{warehouse_id}:
+    delete:
+      summary: RevokeWarehouseAccess（撤销一个仓库，幂等，权限 erp.inventory.manage_access）
+      operationId: revokeWarehouseAccess
+      parameters:
+        - name: sub
+          in: path
+          required: true
+          schema: { type: string }
+        - name: warehouse_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK（撤销一条本来没有的授权也是 200）
+
 components:
   schemas:
     MovementReason:
