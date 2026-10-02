@@ -191,7 +191,7 @@ func updateOnHand(ctx context.Context, tx *sql.Tx, c stockChange, whID int64) er
 }
 
 // isNegative 只看符号，不把十进制字符串转成浮点数。service 层已校验过它是
-// 合法的非零数字。
+// 严格十进制写法（validateQty 的 decimalQty）的非零数，不带首尾空白。
 func isNegative(numeric string) bool {
 	return strings.HasPrefix(strings.TrimSpace(numeric), "-")
 }

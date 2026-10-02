@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -244,5 +245,66 @@ func TestNewReadEndpoints_REST响应体形状(t *testing.T) {
 	}
 	if _, isList := m["low_stock"].([]any); !isList {
 		t.Fatalf("low_stock 应是数组（没有低库存时是空数组，不是 null），实际 %T", m["low_stock"])
+	}
+}
+
+// postErrorCode 发一次 POST（JSON 体），返回 handler 交出的 gRPC 错误码与 HTTP
+// 状态码（handler 自己写 400 的绑定错误时 code 是 OK、status 是 400）。
+func postErrorCode(t *testing.T, path string, h gin.HandlerFunc, sub string, body any) (codes.Code, int) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	eng := gin.New()
+	got := codes.OK
+	eng.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			got = status.Code(c.Errors.Last().Err)
+		}
+	})
+	eng.POST(path, h)
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(besdk.ContextWithClaims(req.Context(), besdk.Claims{Sub: sub}))
+	w := httptest.NewRecorder()
+	eng.ServeHTTP(w, req)
+	return got, w.Code
+}
+
+// TestMovements_REST的NaN_Inf_科学计数法数量返回400：POST /movements/receive 的
+// qty 与 /movements/adjust 的 qty_delta 是 "NaN"、"Inf"、"1e3" 时，handler 交出
+// InvalidArgument（SDK 引擎映射成 HTTP 400）；空串在绑定这一步就是 400。
+func TestMovements_REST的NaN_Inf_科学计数法数量返回400(t *testing.T) {
+	r, db := testRepo(t)
+	svc := service.New(r, slog.Default())
+	east := warehouseID(t, db, "WH-EAST")
+	sub := unique("http-qty-strict")
+	if err := r.GrantWarehouseAccess(context.Background(), sub, east); err != nil {
+		t.Fatal(err)
+	}
+	pid := unique("http-qty-strict")
+
+	for i, qty := range []string{"NaN", "Inf", "1e3"} {
+		key := fmt.Sprintf("%s-%d", pid, i)
+		got, _ := postErrorCode(t, "/movements/receive", receiveHandler(svc), sub, map[string]string{
+			"idempotency_key": "recv-" + key, "product_id": pid, "warehouse_id": east, "qty": qty,
+		})
+		if got != codes.InvalidArgument {
+			t.Errorf("POST /movements/receive qty=%q 应交出 InvalidArgument（HTTP 400），实际 %v", qty, got)
+		}
+		got, _ = postErrorCode(t, "/movements/adjust", adjustHandler(svc), sub, map[string]string{
+			"idempotency_key": "adj-" + key, "product_id": pid, "warehouse_id": east, "qty_delta": qty, "reason": "test",
+		})
+		if got != codes.InvalidArgument {
+			t.Errorf("POST /movements/adjust qty_delta=%q 应交出 InvalidArgument（HTTP 400），实际 %v", qty, got)
+		}
+	}
+	if _, code := postErrorCode(t, "/movements/receive", receiveHandler(svc), sub, map[string]string{
+		"idempotency_key": "recv-empty-" + pid, "product_id": pid, "warehouse_id": east, "qty": "",
+	}); code != http.StatusBadRequest {
+		t.Errorf("POST /movements/receive qty=\"\" 应返回 400，实际 %d", code)
 	}
 }

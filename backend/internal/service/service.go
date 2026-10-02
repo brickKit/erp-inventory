@@ -9,7 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
+	"regexp"
+	"strings"
 
 	besdk "github.com/brickKit/be-sdk-go"
 	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
@@ -45,18 +46,29 @@ func New(r *repo.Repo, logger *slog.Logger, opts ...Option) *Service {
 	return s
 }
 
+// decimalQty 是数量入参唯一接受的写法：十进制字符串，可带负号，最多 12 位整数、
+// 6 位小数——与列类型 NUMERIC(18,6) 对齐，超出的位数不会被悄悄舍入或溢出成 500。
+//
+// ⚠️ 不能用 strconv.ParseFloat 校验：它放行 "NaN"、"Inf"、"1e3"、"0x1p4"。NaN
+// 进了 NUMERIC 排在所有数之上，on_hand_qty 一旦是 NaN 就永远是 NaN，CHECK 与
+// 防超卖条件对这一行恒真，从此可以无限超卖。
+var decimalQty = regexp.MustCompile(`^-?[0-9]{1,12}(\.[0-9]{1,6})?$`)
+
+// validateQty 只看字符串，不转浮点：先核对写法，再按字符判断符号与是否为 0
+// （"0.000"、"-0" 也是 0）。allowNegative 只给 Adjust 的 qty_delta（盘亏）。
 func validateQty(field, s string, allowNegative bool) error {
 	if s == "" {
 		return fmt.Errorf("%w: %s 不能为空", ErrInvalidArgument, field)
 	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return fmt.Errorf("%w: %s 不是合法数字：%q", ErrInvalidArgument, field, s)
+	if !decimalQty.MatchString(s) {
+		return fmt.Errorf("%w: %s 不是合法十进制数（最多 12 位整数、6 位小数；不收 NaN / Inf / 科学计数法）：%q",
+			ErrInvalidArgument, field, s)
 	}
-	if !allowNegative && f <= 0 {
+	zero := strings.Trim(s, "-0.") == ""
+	if !allowNegative && (zero || strings.HasPrefix(s, "-")) {
 		return fmt.Errorf("%w: %s 必须为正数：%q", ErrInvalidArgument, field, s)
 	}
-	if allowNegative && f == 0 {
+	if allowNegative && zero {
 		return fmt.Errorf("%w: %s 不能为 0", ErrInvalidArgument, field)
 	}
 	return nil

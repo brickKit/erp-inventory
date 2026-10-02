@@ -190,3 +190,114 @@ func TestGetReservationStatus_查不到不是错误(t *testing.T) {
 		t.Fatalf("期望 NOT_FOUND，实际 %q", status)
 	}
 }
+
+// badQtyInputs 是数量入参里 strconv.ParseFloat 会放行、但不是十进制数的写法
+// （外加空串）。"NaN" 最危险：PostgreSQL 把它存进 NUMERIC 并排在所有数之上，
+// on_hand_qty 一旦变成 NaN 就永远是 NaN，CHECK 与防超卖条件全部恒真。"Inf" 进
+// NUMERIC(18,6) 是溢出 500 而不是 400；"1e3"、"0x1p4" 是浮点写法；多于 6 位小数
+// 会被列类型悄悄舍入（"0.0000001" 舍成 0）；13 位整数超出 NUMERIC(18,6) 的范围。
+var badQtyInputs = []string{
+	"NaN", "nan", "Inf", "-Inf", "+Inf", "Infinity", "1e3", "0x1p4", "",
+	" 1", "1 ", "+1", "1.", ".5", "1.0000001", "0.0000001", "1234567890123",
+}
+
+// balanceRowCount 数 (product_id, 任意仓库) 的余额行——被拒绝的入参不该写下任何东西。
+func balanceRowCount(t *testing.T, db *sql.DB, productID string) int {
+	t.Helper()
+	var n int
+	err := besdk.WithTx(context.Background(), db, "erp_inventory_rw", "erp_inventory",
+		func(tx *sql.Tx) error {
+			return tx.QueryRow(`SELECT count(*) FROM inventory_balances WHERE product_id = $1`, productID).Scan(&n)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// TestQty_NaN_Inf_科学计数法与空串一律是InvalidArgument：Receive 的 qty、Adjust
+// 的 qty_delta、Reserve 的 qty 只收严格的十进制字符串。调用者有仓库授权，所以
+// 被拒绝只可能是因为数量本身；被拒绝的请求一行余额都不写。
+func TestQty_NaN_Inf_科学计数法与空串一律是InvalidArgument(t *testing.T) {
+	svc, r, db := newTestService(t)
+	east := warehouseID(t, db, "WH-EAST")
+	pid := svcUniqueProductID("svc-qty-strict")
+	ctx := authedCtx(t, r, "u_test-qty-strict", east)
+
+	for i, qty := range badQtyInputs {
+		key := fmt.Sprintf("%s-%d", pid, i)
+		_, err := svc.Receive(ctx, repo.ReceiveInput{
+			IdempotencyKey: "recv-" + key, ProductID: pid, WarehouseID: east, Qty: qty,
+		})
+		if !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Receive qty=%q 应该是 InvalidArgument，实际：%v", qty, err)
+		}
+		_, err = svc.Adjust(ctx, repo.AdjustInput{
+			IdempotencyKey: "adj-" + key, ProductID: pid, WarehouseID: east, QtyDelta: qty, Reason: "test",
+		})
+		if !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Adjust qty_delta=%q 应该是 InvalidArgument，实际：%v", qty, err)
+		}
+		_, err = svc.Reserve(ctx, repo.ReserveInput{
+			IdempotencyKey: "rsv-" + key, OrderID: "o-" + key,
+			Items: []repo.ReserveItem{{ProductID: pid, WarehouseID: east, Qty: qty}},
+		})
+		if !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Reserve qty=%q 应该是 InvalidArgument，实际：%v", qty, err)
+		}
+	}
+	if n := balanceRowCount(t, db, pid); n != 0 {
+		t.Fatalf("被拒绝的数量入参不该写下余额行，实际 %d 行", n)
+	}
+}
+
+// TestQty_各种零一律拒绝：判断"是不是 0"按十进制字符串做，"0.000" 与 "-0" 也是 0。
+func TestQty_各种零一律拒绝(t *testing.T) {
+	svc, r, db := newTestService(t)
+	east := warehouseID(t, db, "WH-EAST")
+	pid := svcUniqueProductID("svc-qty-zero")
+	ctx := authedCtx(t, r, "u_test-qty-zero", east)
+
+	for i, qty := range []string{"0", "0.000", "-0", "-0.0", "000"} {
+		key := fmt.Sprintf("%s-%d", pid, i)
+		if _, err := svc.Receive(ctx, repo.ReceiveInput{
+			IdempotencyKey: "recv-" + key, ProductID: pid, WarehouseID: east, Qty: qty,
+		}); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Receive qty=%q 应该拒绝，实际：%v", qty, err)
+		}
+		if _, err := svc.Adjust(ctx, repo.AdjustInput{
+			IdempotencyKey: "adj-" + key, ProductID: pid, WarehouseID: east, QtyDelta: qty, Reason: "test",
+		}); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("Adjust qty_delta=%q 应该拒绝，实际：%v", qty, err)
+		}
+	}
+}
+
+// TestQty_合法十进制照常接受：严格校验的对照组——最多 12 位整数、6 位小数都收，
+// 入库后在手量是精确的十进制和。
+func TestQty_合法十进制照常接受(t *testing.T) {
+	svc, r, db := newTestService(t)
+	east := warehouseID(t, db, "WH-EAST")
+	pid := svcUniqueProductID("svc-qty-ok")
+	ctx := authedCtx(t, r, "u_test-qty-ok", east)
+
+	for i, qty := range []string{"1", "0.5", "12.000001", "007"} {
+		if _, err := svc.Receive(ctx, repo.ReceiveInput{
+			IdempotencyKey: fmt.Sprintf("recv-%s-%d", pid, i), ProductID: pid, WarehouseID: east, Qty: qty,
+		}); err != nil {
+			t.Fatalf("Receive qty=%q 应该接受，实际：%v", qty, err)
+		}
+	}
+	if _, err := svc.Adjust(ctx, repo.AdjustInput{
+		IdempotencyKey: "adj-" + pid, ProductID: pid, WarehouseID: east, QtyDelta: "-0.500001", Reason: "盘亏",
+	}); err != nil {
+		t.Fatalf("Adjust qty_delta=-0.500001 应该接受，实际：%v", err)
+	}
+	b, err := svc.GetBalance(ctx, pid, east)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.OnHandQty != "20.000000" {
+		t.Fatalf("在手量应是 1+0.5+12.000001+7-0.500001 = 20.000000，实际 %s", b.OnHandQty)
+	}
+}
