@@ -1,5 +1,5 @@
-// 阶段三 Task 6：warehouse_access 分配表 + 数据范围过滤真实生效——
-// 对应 004_create_warehouse_access.up.sql 顶部注释。
+// warehouse_access 分配表 + warehouse 维数据范围过滤真实生效——对应
+// 004_create_warehouse_access.up.sql 顶部注释。
 package repo
 
 import (
@@ -118,7 +118,7 @@ func TestReceive_没有授权时ErrForbidden(t *testing.T) {
 	_, err := r.Receive(ctx, ReceiveInput{
 		IdempotencyKey: "test-recv-forbidden-" + pid, ProductID: pid, WarehouseID: east,
 		AllowedWarehouseIDs: allowedWarehouses(t, south), // 只授权了南仓，却往东仓入库
-		Qty: "10",
+		Qty:                 "10",
 	})
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("对没有授权的仓库入库应该是 ErrForbidden，实际：%v", err)
@@ -136,7 +136,7 @@ func TestReceive_没有授权时ErrForbidden(t *testing.T) {
 
 // TestListMovements_只看到授权仓库的流水 是 List 端点数据范围过滤的核心
 // 断言：授权范围必须下推进 SQL 的 WHERE，不能查出全部结果后在 Go 里再
-// 过滤那一半（决策 53 的既有判据同样适用于这里）。
+// 过滤那一半（那样分页会被滤出空页，next_cursor 却还在）。
 func TestListMovements_只看到授权仓库的流水(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()

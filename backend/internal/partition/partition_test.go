@@ -63,8 +63,8 @@ func testDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// TestEnsureAllMonthly_与迁移建的初始分区命名一致不冲突 是设计计划 §9
-// 第 8 条那个真 bug 的回归测试：迁移建的初始分区名必须和这里生成的名字
+// TestEnsureAllMonthly_与迁移建的初始分区命名一致不冲突 是分区命名不一致那个
+// 真 bug 的回归测试：迁移建的初始分区名必须和这里生成的名字
 // 完全一样（"表名_YYYY_MM_01"），否则 to_regclass 查不到已存在的分区，
 // 会尝试新建同一段时间范围的分区，撞上 PostgreSQL 分区范围不许重叠的
 // 报错。这条测试连跑两次 ensureAllMonthly 验证幂等（第二次不该报错、

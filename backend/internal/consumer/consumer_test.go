@@ -83,9 +83,9 @@ func getSnapshot(t *testing.T, db *sql.DB, productID string) (trackingType strin
 	return
 }
 
-// TestConsumer_created事件维护摘要副本 是设计计划 §4、§5 的直接测试：
-// 消费 mdm.product.created.v1 只取 tracking_type，落进
-// product_tracking_snapshots。
+// TestConsumer_created事件维护摘要副本：消费 mdm.product.created.v1 只取
+// tracking_type，落进 product_tracking_snapshots——本组件不依赖 mdm-product，
+// 产品的追踪方式只能从事件来。
 func TestConsumer_created事件维护摘要副本(t *testing.T) {
 	db := testDB(t)
 	nc, err := nats.Connect(natsURLForTest(t))

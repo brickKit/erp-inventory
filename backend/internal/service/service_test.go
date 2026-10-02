@@ -52,7 +52,7 @@ func warehouseID(t *testing.T, db *sql.DB, code string) string {
 }
 
 // authedCtx 造一个"已经过 RequirePermission 验签"的 ctx（besdk.ContextWithClaims，
-// 阶段三 Task 6 发现的真实缺口，见 be-sdk-go authz.go 同名函数注释），
+// 见 be-sdk-go authz.go 同名函数注释），
 // 并真的把 sub 授权到 warehouseIDs——service 层调用 GetBalance/Receive/
 // Adjust/ListMovements 时会真的查 warehouse_access 表，只造一份假 Claims
 // 不授权访问，一样会被 ErrForbidden 拦下来，测的就不是"输入校验"这件事了。
@@ -175,8 +175,8 @@ func TestGetReservationStatus_两个都为空时拒绝(t *testing.T) {
 	}
 }
 
-// TestGetReservationStatus_查不到不是InvalidArgument 判据来自设计计划
-// §4.5：NOT_FOUND 是正常业务结果，不该被 service 层的校验拦下来当成
+// TestGetReservationStatus_查不到不是错误：NOT_FOUND 是正常业务结果，不该被
+// service 层的校验拦下来当成
 // 错误——只有"格式不对"（比如非数字）才是校验该管的范围。
 func TestGetReservationStatus_查不到不是错误(t *testing.T) {
 	svc, _, _ := newTestService(t)

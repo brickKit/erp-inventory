@@ -11,16 +11,16 @@ import (
 	"pgregory.net/rapid"
 )
 
-// TestProperty_库存三大不变式 是 04-testing-standard.md §3.2 对"核心交易类
-// 组件"的强制要求：例子测试只能证明"我想到的这几种情形是对的"，测不出
+// TestProperty_库存三大不变式：核心交易类组件的 L2 必须有属性测试——例子
+// 测试只能证明"我想到的这几种情形是对的"，测不出
 // "只在某个特定操作序列下才会触发"的边界 bug。这里用 rapid 生成随机的
 // Receive/Reserve/ConfirmIssue/CancelReservation/Adjust 操作序列攻击同一个
 // (product, warehouse)，每做完一步就查一次余额，断言三条不变式——不管
 // 操作序列长什么样——永远成立：
-//   1. on_hand_qty 永不为负
-//   2. reserved_qty 永不为负
-//   3. available（on_hand - reserved）永不为负——这条等价于"预留永远
-//      不会超过在库"，是防超卖的最终判据
+//  1. on_hand_qty 永不为负
+//  2. reserved_qty 永不为负
+//  3. available（on_hand - reserved）永不为负——这条等价于"预留永远
+//     不会超过在库"，是防超卖的最终判据
 func TestProperty_库存三大不变式(t *testing.T) {
 	db := testDB(t)
 	east := warehouseID(t, db, "WH-EAST")
@@ -124,12 +124,10 @@ func TestProperty_库存三大不变式(t *testing.T) {
 	})
 }
 
-// TestProperty_Reserve并发同key仅执行一次 补的是 04-testing-standard.md §3.2
-// 明确要求、但此前项目里从没写过的那一半幂等性测试："两个并发请求带着
-// 同一个 idempotency_key 同时到达"，而不是"串行重放同一个 key 两次"——
-// 已有的 TestReserve_并发防超卖 测的是另一件事（N 个不同 key 抢同一批
-// 库存，验证不超卖），从没验证过"同一个 key 并发到达时是不是真的只执行
-// 一次"。用 rapid 随机出并发数与预留数量，重复攻击 claimIdempotency 的
+// TestProperty_Reserve并发同key仅执行一次 测的是幂等性的另一半："两个并发
+// 请求带着同一个 idempotency_key 同时到达"，而不是"串行重放同一个 key 两次"
+// ——TestReserve_并发防超卖 测的是另一件事（N 个不同 key 抢同一批库存，验证
+// 不超卖），验证不了"同一个 key 并发到达时是不是真的只执行一次"。用 rapid 随机出并发数与预留数量，重复攻击 claimIdempotency 的
 // `INSERT ... ON CONFLICT DO NOTHING` 那条判据。
 func TestProperty_Reserve并发同key仅执行一次(t *testing.T) {
 	db := testDB(t)

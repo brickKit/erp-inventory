@@ -13,7 +13,7 @@ import (
 	"time"
 
 	besdk "github.com/brickKit/be-sdk-go"
-	_ "github.com/jackc/pgx/v5/stdlib" // §12.4：不用 lib/pq，驱动名注册为 "pgx"
+	_ "github.com/jackc/pgx/v5/stdlib" // 锁定栈用 pgx，不用 lib/pq；驱动名注册为 "pgx"
 )
 
 func testDB(t *testing.T) *sql.DB {
@@ -353,8 +353,8 @@ func TestConfirmIssue_确认后onHand与reserved都扣减且发流水(t *testing
 	}
 }
 
-// TestGetReservationStatus_区分NotFound与Cancelled 是设计计划 §4.5 那条
-// 硬约束的直接测试：合并成一个"没有"是错的。
+// TestGetReservationStatus_区分NotFound与Cancelled：NOT_FOUND（请求根本没到，
+// 可以安全重试）与 CANCELLED（到了且已撤销，不能重试）合并成一个"没有"是错的。
 func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()
@@ -399,8 +399,8 @@ func TestGetReservationStatus_区分NotFound与Cancelled(t *testing.T) {
 	}
 }
 
-// TestGetReservationStatus_按idempotencyKey查 是设计计划 §9 那条新增
-// 契约字段的直接测试：Reserve 本身超时时调用方拿不到 reservation_id，
+// TestGetReservationStatus_按idempotencyKey查 是 idempotency_key 这条查询路径
+// 的直接测试：Reserve 本身超时时调用方拿不到 reservation_id，
 // 只能带着当初发的 idempotency_key 查——这条测试验证这条路径查到的
 // 结果与按 reservation_id 查完全一致，且查一个从没提交过的
 // idempotency_key 会得到真正的 NOT_FOUND（不是报错）。
@@ -439,7 +439,7 @@ func TestGetReservationStatus_按idempotencyKey查(t *testing.T) {
 	}
 	// ⚠️ 这是这条新增返回值存在的全部意义：调用方查到 RESERVED 后必须能
 	// 拿到真正的 reservation_id 存下来，供后续 CancelOrder/ShipOrder 用
-	// ——只告诉状态不告诉 id，调用方查到了也还是没法用（设计计划 §9 第 9 条）。
+	// ——只告诉状态不告诉 id，调用方查到了也还是没法用。
 	if ridByKey != rid {
 		t.Fatalf("按 idempotency_key 查应该解析出真正的 reservation_id=%s，实际 %q", rid, ridByKey)
 	}
@@ -537,11 +537,11 @@ func TestAdjust_盘盈盘亏正确记流水与note(t *testing.T) {
 	}
 }
 
-// ── 核心测试：并发防超卖（设计计划 §9 第 1 条，这块砖的核心测试）──
+// ── 核心测试：并发防超卖（参考实现里没有 TCC 预留可抄，正确性只能靠它）──
 //
 // N 个 goroutine 同时预留同一个 SKU，库存只够其中 M 个（M < N）。断言：
 // 成功的必须恰好 M 个，余额必须恰好归零，一条超卖都不许有。这条测试挂了
-// 就是真的会超卖，不许放宽断言（SOP-W 的 W-5）。
+// 就是真的会超卖，不许放宽断言。
 func TestReserve_并发防超卖(t *testing.T) {
 	db := testDB(t)
 	db.SetMaxOpenConns(50) // 让 N 个并发请求真的用上不同的物理连接，而不是排队串行
