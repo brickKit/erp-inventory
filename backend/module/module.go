@@ -1,7 +1,6 @@
-// Package module 是 erp-inventory 唯一的装配入口（全局约束 §K、设计书
-// §12.5.1、§13.3 铁律七）。单跑与合并走同一个 New 函数；模块只交回零件
-// （handler、gRPC 注册函数、迁移、后台循环），谁去 Listen、谁开池、
-// 谁 init OTel、谁装信号处理器，全归调用方。
+// Package module 是 erp-inventory 唯一的装配入口。单跑与进外壳走同一个 New
+// 函数；模块只交回零件（handler、gRPC 注册函数、后台循环），谁去 Listen、谁
+// 开池、谁初始化 OTel、谁装信号处理器，全归调用方（RunStandalone 或外壳）。
 package module
 
 import (
@@ -20,14 +19,15 @@ import (
 	"github.com/brickKit/erp-inventory/v2/backend/internal/service"
 )
 
-// New 构造 erp-inventory 模块。签名一个字都不许改（§12.5.1）——62 个
-// 组件都是这一个签名，外壳启动器与 be-ops 产出 4 都按它生成。
+// New 构造 erp-inventory 模块。签名一个字都不许改——外壳的 Registry 按这个
+// 签名登记每个成员。
 func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
-	// ⚠️ 配置只从 rt.Config 来，模块里零 os.Getenv（§12.5.3、决策 110）。
+	// ⚠️ 配置只从 rt.Config 来，模块里零 os.Getenv：进外壳后一个进程只有一份
+	// 环境，成员会互相覆盖同名键。
 	schema := rt.Config.StringOr("PG_SCHEMA", "erp_inventory")
 	role := schema + "_rw"
 
-	// ⚠️ 池从 rt.DB 来，不许自己 sql.Open（§13.3 铁律二）。
+	// ⚠️ 池从 rt.DB 来，不许自己 sql.Open：进外壳后所有成员共用外壳的一个池。
 	threshold, err := lowStockThreshold(rt.Config)
 	if err != nil {
 		return nil, err
@@ -45,8 +45,8 @@ func New(ctx context.Context, rt *besdk.Runtime) (*besdk.Module, error) {
 	return &besdk.Module{
 		HTTPHandler: eng,
 
-		// ⚠️ gRPC 一个不省，而且由调用方在 extraPorts["grpc"] 上 Listen
-		// （§1.5 原则一）。
+		// ⚠️ gRPC 一个不省，而且由调用方在 extraPorts["grpc"] 上 Listen：
+		// 组件之间的调用永远走真实的 gRPC，哪怕进了同一个外壳。
 		RegisterGRPC: func(gs *grpc.Server) {
 			inventoryv1.RegisterInventoryServiceServer(gs, grpcapi.New(svc))
 		},

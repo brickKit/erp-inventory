@@ -9,10 +9,10 @@ import (
 )
 
 // ToStatus 把 repo 层的哨兵错误翻成 gRPC status——HTTP 与 gRPC 两条对外
-// 接口共用同一套业务错误类型（同 mdm-product 的判据）。
+// 接口共用同一套业务错误类型（HTTP 由 SDK 引擎的中间件再翻成状态码）。
 //
-// ⚠️ ErrInsufficientStock → FailedPrecondition 是设计计划 §2.2 明确写死
-// 的判据："RowsAffected() == 0 就是库存不足，返回 FailedPrecondition"。
+// ⚠️ ErrInsufficientStock → FailedPrecondition（HTTP 400）：条件更新
+// RowsAffected() == 0 就是库存不足，调用方据此决定补货或拒单，不是服务端故障。
 func ToStatus(err error) error {
 	if err == nil {
 		return nil

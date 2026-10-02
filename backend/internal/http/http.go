@@ -1,8 +1,7 @@
 // Package http 是 erp-inventory 的 REST 面（对外路径前缀 /erp/inventory，
-// 与 assembly.yaml 的 edge_routes 一致）。⚠️ 只暴露 Receive/Adjust/
-// GetBalance/ListMovements——TCC 四件套（Reserve/CancelReservation/
-// ConfirmIssue/GetReservationStatus）永远不进 REST，它们是组件间协议，
-// 不是人类操作（contracts/inventory.openapi.yaml、设计计划 §3）。
+// 与 assembly.yaml 的 edge_routes 一致），契约是 contracts/inventory.openapi.yaml。
+// ⚠️ TCC 四件套（Reserve/CancelReservation/ConfirmIssue/GetReservationStatus）
+// 与 BatchGetBalance 永远不进 REST：它们是组件间协议，不是人类操作。
 package http
 
 import (
@@ -18,16 +17,13 @@ import (
 	"github.com/brickKit/erp-inventory/v2/backend/internal/service"
 )
 
-// RegisterRoutes 挂载业务路由。
+// RegisterRoutes 挂载业务路由，每条都带 assembly.yaml 里声明的权限键。
 //
-// 阶段三 Task 6：权限键从阶段二的 besdk.Public 换成 assembly.yaml 里
-// 声明的真实键。⚠️ `erp.inventory.reserve`/`.issue` 两个已声明的权限键
-// 在这里用不上——`Reserve`/`ConfirmIssue` 永远不进 REST（组件间 TCC
-// 协议，不是人类操作，见包文档），它们只是权限目录里的条目，供菜单/
-// 审计展示，不对应任何 besdk.GET/POST 调用点，这是设计使然不是漏填。
-// `warehouse` 维数据范围（谁能看哪个仓库）另见 scope.go——不经
-// besdk.ScopeOf（那是纯读 JWT 的 org/owner 两维），本组件自己查
-// warehouse_access 表。
+// ⚠️ `erp.inventory.reserve` / `.issue` 两个已声明的权限键在这里用不上——
+// Reserve / ConfirmIssue 永远不进 REST（见包文档），它们只是权限目录里的
+// 条目，供角色配置与审计展示，不对应任何 besdk.GET/POST 调用点，不是漏填。
+// warehouse 维数据范围（谁能看哪个仓库）不在 JWT 里：service 层用
+// besdk.ScopeOf 取 sub，再查本组件自己的 warehouse_access 表。
 func RegisterRoutes(eng *gin.Engine, svc *service.Service) {
 	g := eng.Group("/erp/inventory")
 	besdk.POST(g, "/movements/receive", "erp.inventory.receive", receiveHandler(svc))
@@ -172,7 +168,7 @@ func listMovementsHandler(svc *service.Service) gin.HandlerFunc {
 	}
 }
 
-// ── warehouse_access 管理（阶段三 Task 6，erp.inventory.manage_access）──
+// ── warehouse_access 管理（erp.inventory.manage_access）──
 
 func listWarehouseAccessHandler(svc *service.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -1,5 +1,5 @@
-// Package grpc 实现 erp.inventory.v1.InventoryService——内部 gRPC 面
-// （§2.1）。HTTP 与 gRPC 共用同一个 service.Service，业务逻辑只写一遍。
+// Package grpc 实现 erp.inventory.v1.InventoryService——组件之间调用的 gRPC
+// 面。HTTP 与 gRPC 共用同一个 service.Service，业务逻辑只写一遍。
 package grpc
 
 import (
@@ -32,8 +32,8 @@ func toProtoStatus(s string) inventoryv1.ReservationStatus {
 	case repo.StatusCancelled:
 		return inventoryv1.ReservationStatus_RESERVATION_STATUS_CANCELLED
 	default:
-		// ⚠️ UNSPECIFIED 就是 NOT_FOUND 的信号，不是"忘了填"（设计计划
-		// §3、§4.5）。
+		// ⚠️ UNSPECIFIED 就是 NOT_FOUND 的信号，不是"忘了填"：上游据此判断
+		// 请求根本没到、可以安全重试。
 		return inventoryv1.ReservationStatus_RESERVATION_STATUS_UNSPECIFIED
 	}
 }
@@ -123,7 +123,7 @@ func (s *server) GetBalance(ctx context.Context, req *inventoryv1.GetBalanceRequ
 	return toProtoBalance(b), nil
 }
 
-// BatchGetBalance 是防 N+1 的唯一合法调用方式（§3.8）。
+// BatchGetBalance 是组件间批量读余额的唯一方式（防 N+1）。
 func (s *server) BatchGetBalance(ctx context.Context, req *inventoryv1.BatchGetBalanceRequest) (*inventoryv1.BatchGetBalanceResponse, error) {
 	keys := make([]repo.BalanceKey, 0, len(req.Keys))
 	for _, k := range req.Keys {

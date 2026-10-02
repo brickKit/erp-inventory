@@ -6,11 +6,11 @@ import (
 )
 
 // UpsertProductTrackingSnapshotTx 维护 product_tracking_snapshots 摘要
-// 副本——只取 tracking_type（设计计划 §5）。供 backend/internal/consumer
+// 副本——只取 tracking_type。供 backend/internal/consumer
 // 在 besdk.Consume 给的事务里调用，因此接 *sql.Tx 而不是自己开
 // besdk.WithTx（那会开一个新事务，和 Consume 已经打开的那个冲突）。
 //
-// ⚠️ WHERE version < $3 是按 version 单调更新（§3.10）：besdk.Consume 的
+// ⚠️ WHERE version < $3 是按 version 严格递增更新：besdk.Consume 的
 // event_inbox 只在"同一个 subject"内保证单调，created.v1 和 updated.v1
 // 是两个不同的 subject，跨 subject 的乱序（updated 先于 created 到达）
 // 必须在这一层的 UPSERT 里再挡一次。

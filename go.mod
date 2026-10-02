@@ -13,11 +13,10 @@ require (
 	pgregory.net/rapid v1.3.0
 )
 
-// gen/erp/inventory 是本仓库自己嵌套的 go module（不是外部依赖）——理由与
-// module 边界的取舍同 erp-finance 的 go.mod 那条注释（阶段四调研记录 04 §13）：
-// 让外壳能把 erp-sales vendor 的同一份契约镜像 replace 到这里，避免 protobuf
-// 全局注册表撞车；module 边界切在 v1 的上一级，因为 Go 模块路径禁止以字面量
-// `/v1` 结尾。
+// gen/erp/inventory 是本仓库里嵌套的独立模块：调用方（erp-sales 等）只 require
+// 契约包、不拉整个组件，进同一个外壳时最小版本选择只选出一份生成代码，protobuf
+// 注册表不会重复注册。模块路径不能以 /v1 结尾，所以边界切在 v1 的上一级。下面的
+// replace 只给本仓库自己构建用；别人拉取时用的是 require 里的契约包 tag。
 replace github.com/brickKit/erp-inventory/gen/erp/inventory => ./gen/erp/inventory
 
 require (

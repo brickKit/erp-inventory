@@ -15,19 +15,20 @@ import (
 	"github.com/brickKit/erp-inventory/v2/backend/internal/repo"
 )
 
-// allowedWarehouseIDs 是 Receive/Adjust/GetBalance/ListMovements 四个
-// REST 端点共用的一步：从 besdk.ScopeOf(ctx) 取 sub、查 warehouse_access
-// 表拿到这个人当前能访问的仓库列表。⚠️ 只用于这四个 REST 端点——
-// Reserve/CancelReservation/ConfirmIssue/BatchGetBalance 是组件间 gRPC
-// 协议（erp-sales 等调用方），ctx 里没有经过 besdk.RequirePermission
-// 验签的 Claims，调 ScopeOf 会 panic，这是设计使然（阶段三 Task 6
-// 讨论定案：gRPC 侧数据权限透传是更大的独立工作，不在本任务范围）。
+// allowedWarehouseIDs 是所有按 warehouse 维过滤的端点（Receive / Adjust /
+// GetBalance / ListMovements / ListWarehouses / ListBalances / StockSummary）
+// 共用的一步：从 besdk.ScopeOf(ctx) 取 sub、查 warehouse_access 表拿到这个人
+// 当前能访问的仓库列表。⚠️ 只有经过 RequirePermission 验签的 REST 请求才有
+// Claims：Reserve / CancelReservation / ConfirmIssue / BatchGetBalance 是组件间
+// gRPC 协议，不调它；同名读写方法经 gRPC 直连时 ctx 里没有 Claims，ScopeOf
+// panic、被 SDK 的恢复拦截器接成 Internal——失败关闭，不会多返回数据。gRPC 上
+// 按调用者透传数据范围是另一件事，见 docs/design.md 的未决问题。
 func (s *Service) allowedWarehouseIDs(ctx context.Context) ([]int64, error) {
 	sub := besdk.ScopeOf(ctx).Owner
 	return s.repo.WarehouseIDsFor(ctx, sub)
 }
 
-// ErrInvalidArgument 是入参本身不合法（同 mdm-product 的判据）。
+// ErrInvalidArgument 是入参本身不合法。
 var ErrInvalidArgument = errors.New("参数不合法")
 
 type Service struct {
@@ -119,14 +120,13 @@ func (s *Service) ConfirmIssue(ctx context.Context, in repo.ConfirmIssueInput) (
 	return status, movementIDs, nil
 }
 
-// GetReservationStatus 是防"薛定谔的超时"的唯一手段——查不到（NOT_FOUND）
-// 不是错误，是这个接口存在的意义本身（设计计划 §4.5），不在这里拦截。
+// GetReservationStatus 是上游超时之后判断"请求到底有没有生效"的唯一手段——
+// 查不到（NOT_FOUND）不是错误，是这个接口存在的意义本身，不在这里拦截。
 //
-// ⚠️ reservationID/idempotencyKey 二选一（设计计划 §9）：Reserve 本身
-// 超时时调用方拿不到 reservation_id，只能带着当初发的 idempotency_key
-// 来查。两个都不给才是入参错误。返回值多了 resolvedReservationID——
-// 走 idempotencyKey 分支时调用方必须能拿到真正的 reservation_id 才能
-// 存下来供后续 Cancel/ConfirmIssue 用。
+// ⚠️ reservationID / idempotencyKey 二选一：Reserve 本身超时时调用方拿不到
+// reservation_id，只能带着当初发的 idempotency_key 来查。两个都不给才是入参
+// 错误。返回 resolvedReservationID：走 idempotencyKey 分支时调用方必须拿到
+// 真正的 reservation_id，存下来供后续 Cancel / ConfirmIssue 用。
 func (s *Service) GetReservationStatus(ctx context.Context, reservationID, idempotencyKey string) (status, orderID, resolvedReservationID string, err error) {
 	if reservationID == "" && idempotencyKey == "" {
 		return "", "", "", fmt.Errorf("%w: reservation_id 与 idempotency_key 不能同时为空", ErrInvalidArgument)
@@ -217,7 +217,7 @@ func (s *Service) ListMovements(ctx context.Context, in repo.ListInput) (*repo.L
 	return s.repo.ListMovements(ctx, in)
 }
 
-// ── warehouse_access 管理（阶段三 Task 6）──
+// ── warehouse_access 管理 ──
 
 func (s *Service) ListWarehouseAccess(ctx context.Context, sub string) ([]int64, error) {
 	if sub == "" {

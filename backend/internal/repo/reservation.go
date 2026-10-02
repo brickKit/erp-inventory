@@ -1,5 +1,4 @@
-// TCC 三件套 + 状态查询——防超卖与防"薛定谔的超时"都在这个文件里
-// （设计计划 §3、§4.5）。
+// TCC 三件套 + 状态查询——防超卖与"超时后到底生效没有"的判断都在这个文件里。
 package repo
 
 import (
@@ -16,7 +15,7 @@ import (
 // GetReservationStatus/CancelReservation/ConfirmIssue 对"查不到这个
 // reservation_id"的正常回答——上游超时后必须能区分"根本没到"
 // （StatusUnspecified，可以安全重试）与"到了且已撤销"（StatusCancelled，
-// 不能重试），见设计计划 §3、§4.5。
+// 不能重试），两者合并成一个"没有"会让上游误杀或漏杀。
 const (
 	StatusUnspecified = "" // NOT_FOUND
 	StatusReserved    = "RESERVED"
@@ -44,7 +43,7 @@ type ReserveInput struct {
 
 // Reserve 预留库存：一次调用里的所有项在同一个事务里全部成功或全部失败
 // （TCC 第一步，跨组件写接口）。防超卖的判定与加锁是同一条 UPDATE 语句
-// （设计计划 §2.2）——不是"先查再写"。
+// ——不是"先查再写"。
 func (r *Repo) Reserve(ctx context.Context, in ReserveInput) (string, error) {
 	if len(in.Items) == 0 {
 		return "", fmt.Errorf("%w: items 不能为空", ErrInvalidArgument)
@@ -72,7 +71,7 @@ func (r *Repo) Reserve(ctx context.Context, in ReserveInput) (string, error) {
 			}
 
 			// ⚠️ 防超卖在这一行：判定（够不够）与加锁（这条 UPDATE 本身）
-			// 是同一条语句，中间没有窗口（设计计划 §2.2）。
+			// 是同一条语句，中间没有窗口。
 			res, err := tx.ExecContext(ctx, `
 				UPDATE inventory_balances
 				   SET reserved_qty = reserved_qty + $1, version = version + 1, updated_at = now()
@@ -150,7 +149,7 @@ func loadReservationGroup(ctx context.Context, tx *sql.Tx, reservationID string,
 			return nil, "", "", err
 		}
 		row.WarehouseID = rawWarehouseID
-		status = rowStatus // 组内所有行共享同一个 status（设计计划 §9 第 6 条的不变式）
+		status = rowStatus // 组内所有行共享同一个 status：它们总在同一个事务里一起迁移
 		orderID = row.OrderID
 		rows = append(rows, row)
 	}
@@ -168,8 +167,8 @@ type CancelReservationInput struct {
 
 // CancelReservation 释放预留（TCC 补偿动作）。⚠️ 这是一个"状态内省"式的
 // 接口：查不到、已经是 CANCELLED、已经 CONFIRMED 都不是错误，直接把
-// 当前状态如实返回——错误只留给真正的系统失败（设计计划 §3 的
-// CancelReservationResponse 只带 status，没有单独的"错误详情"字段）。
+// 当前状态如实返回——错误只留给真正的系统失败（CancelReservationResponse
+// 只带 status，没有单独的"错误详情"字段）。
 func (r *Repo) CancelReservation(ctx context.Context, in CancelReservationInput) (string, error) {
 	var status string
 	err := besdk.WithTx(ctx, r.db, r.role, r.schema, func(tx *sql.Tx) error {
@@ -224,8 +223,8 @@ func (r *Repo) CancelReservation(ctx context.Context, in CancelReservationInput)
 }
 
 // ConfirmIssueInput 对应 ConfirmIssueRequest。batch_no/serial_no 对整个
-// reservation 下的所有项统一生效（设计计划 §9 第 7 条：多项各自需要不同
-// 批次/序列号时，调用方应该拆成多个 Reserve/ConfirmIssue）。
+// reservation 下的所有项统一生效：多项各自需要不同批次 / 序列号时，调用方
+// 拆成多个 Reserve / ConfirmIssue（各自一个 reservation_id）。
 type ConfirmIssueInput struct {
 	IdempotencyKey string
 	ReservationID  string
@@ -259,7 +258,7 @@ func (r *Repo) ConfirmIssue(ctx context.Context, in ConfirmIssueInput) (status s
 			// 已确认的情形理论上应该走上面 !claimed 的分支拿到历史
 			// movement_ids；如果是带着一个新 idempotency_key 打到一个
 			// 已经被别的调用确认过的 reservation，这里只如实报告状态，
-			// movement_ids 留空——这个边界情形记进设计计划 §9 第 7 条。
+			// movement_ids 留空。
 			status = current
 		default: // StatusReserved
 			for _, item := range rows {
@@ -354,18 +353,18 @@ func decodeConfirmResult(raw string) (status string, movementIDs []string) {
 	return raw, nil
 }
 
-// GetReservationStatus 是防"薛定谔的超时"的唯一手段（设计计划 §4.5）：
+// GetReservationStatus 是上游超时之后判断"预留到底生效没有"的唯一手段：
 // 上游 Reserve 超时后必须先查这个接口，严禁直接调 Cancel。
 //
 // ⚠️ reservationID 为空、idempotencyKey 非空时走 by-idempotency-key 分支
-// （设计计划 §9：Reserve 本身超时——响应没收到，不代表请求没处理——时
+// （Reserve 本身超时——响应没收到，不代表请求没处理——时
 // 调用方根本不知道 reservation_id，这恰恰是最需要查状态的场景）。
 // command_idempotency 里 idempotency_key → reservation_id 的映射只在
 // Reserve 事务**提交后**才对其他事务可见（READ COMMITTED），所以"查到
 // 映射"与"Reserve 已提交"完全等价；查不到就是真正的 NOT_FOUND，调用方
 // 可以安全地带着同一个 idempotency_key 重试 Reserve——claim-first 幂等
 // 保证不会产生重复预留。
-// ⚠️ 返回值多了 reservationID（设计计划 §9 第 9 条追加）：调用方按
+// ⚠️ 返回 reservationID：调用方按
 // idempotencyKey 查到 RESERVED 后必须把**真正的** reservation_id 存下来
 // （后续 CancelOrder/ShipOrder 要用它调 CancelReservation/ConfirmIssue）
 // ——只告诉状态、不告诉 id，调用方查到了也还是没法用。reservationID 非空

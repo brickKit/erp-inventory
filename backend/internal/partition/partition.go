@@ -1,14 +1,13 @@
 // Package partition 是 Module.Start 的后台循环之一：为 event_outbox/
-// event_inbox 自动创建未来的周分区（决策 54、§11.5.1）——跨周时分区
-// 不存在会让写入直接崩，migrations 里只建了当时那几周的初始分区
-// （见 002_create_outbox_inbox.up.sql），往后必须有人接着建。
+// event_inbox 自动创建未来的周分区——跨周时分区不存在会让写入直接失败，
+// migrations 里只建了初始那几周的分区（见 002_create_outbox_inbox.up.sql），
+// 往后必须有人接着建。
 //
 // inventory_movements 的月分区维护在 monthly.go——它和这里的周分区是
-// 两套独立的窗口逻辑，不能合并成一份（设计计划 §7：交易流水按月，
-// 不是 outbox/inbox 那种周）。
+// 两套独立的窗口逻辑，不能合并成一份（交易流水按月，outbox/inbox 按周）。
 //
 // warehouses/inventory_balances/inventory_reservations/
-// product_tracking_snapshots 不在这里——它们不分区（设计计划 §2、§7）。
+// product_tracking_snapshots 不在这里——它们不分区（余额表必须永远小而快）。
 package partition
 
 import (
@@ -30,7 +29,7 @@ var weeklyPartitionedTables = []string{"event_outbox", "event_inbox"}
 
 // Start 立刻检查一次，之后每 24 小时检查一次。单次检查失败只记日志，
 // 不让整个循环退出——下一轮还有机会补上，且不能因为这个后台任务死了
-// 拖累整个组件（Start 只在 ctx.Done 时返回，§13.3 铁律七）。
+// 拖累整个组件（Start 只在 ctx.Done 时返回）。
 func Start(ctx context.Context, db *sql.DB, role, schema string, logger *slog.Logger) error {
 	if err := ensureAllWeekly(ctx, db, role, schema); err != nil {
 		logger.Error("周分区维护失败", "error", err)

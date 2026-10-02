@@ -1,7 +1,7 @@
-// warehouse_access——阶段三 Task 6 的 warehouse 维数据权限分配表（见
-// 004_create_warehouse_access.up.sql 顶部注释）。这三个函数是本组件
-// 唯一读写这张表的入口，被 service 层的读接口（过滤 List/Get）与
-// 管理接口（grant/revoke）共用。
+// warehouse_access 是 warehouse 维数据范围的分配表："谁能访问哪个仓库"（见
+// 004_create_warehouse_access.up.sql 顶部注释）。这三个函数是本组件唯一读写
+// 这张表的入口，被 service 层的过滤（List/Get/Receive/Adjust/统计）与管理
+// 接口（grant/revoke）共用。
 package repo
 
 import (

@@ -1,6 +1,5 @@
-// inventory_movements 的月分区维护——本组件独有，其余组件都没有按月
-// 分区的表（设计计划 §7、总纲 §11.2.5）。复用 partition.go 的
-// ensurePartition（分区名格式、建分区的 SQL 都一样，只是边界的算法从
+// inventory_movements 的月分区维护——交易流水按月分区。复用 partition.go
+// 的 ensurePartition（分区名格式、建分区的 SQL 都一样，只是边界的算法从
 // "周一"换成"月初"）。
 package partition
 

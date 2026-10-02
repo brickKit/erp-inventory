@@ -1,19 +1,21 @@
 openapi: 3.0.3
 info:
   title: erp-inventory · 库存管理
-  version: 1.0.0
+  version: 2.0.0
   description: |
-    对外 REST 面。内部 gRPC，外部 HTTP（§2.1）。
+    对外 REST 面；别的组件走 gRPC（contracts/erp/inventory/v1/inventory.proto）。
     ⚠️ 不暴露 Reserve/CancelReservation/ConfirmIssue/GetReservationStatus——
-    这四个是组件间 TCC 协议的一部分，不是人类操作（设计计划 §3）。
+    这四个是组件间 TCC 协议的一部分，不是人类操作。
     人类操作是"出库单"，那在 erp-sales / erp-purchase 侧。
-    BatchGetBalance 不暴露：它是给其他组件 gRPC 客户端防 N+1 用的批量读优化。
+    BatchGetBalance 不暴露：它是给其他组件 gRPC 客户端防 N+1 用的批量读。
+    余额、流水、仓库、统计与入库 / 调整都只认调用者 warehouse_access 里授权的仓库；
+    /warehouse-access 是给管理员分配这份授权用的。
 
 servers:
   - url: /erp/inventory
 
-# ⚠️ /healthz 不在这份契约里：be-sdk-go 的 NewGinEngine 给每个组件统一挂的，
-# 路径固定是裸根路径 /healthz（§12.3.6）。
+# ⚠️ /healthz 不在这份契约里：它是 be-sdk-go 的 NewGinEngine 给每个组件统一
+# 挂的裸根路径，不带 /erp/inventory 前缀。
 
 paths:
   /movements/receive:
@@ -136,7 +138,7 @@ paths:
         - name: cursor
           in: query
           schema: { type: string }
-          description: 游标分页（决策 53），无 offset 参数——深分页在契约层面不可表达
+          description: 游标分页，无 offset 参数——深分页在契约层面不可表达；非法游标返回 400
         - name: page_size
           in: query
           schema: { type: integer }
@@ -152,7 +154,7 @@ paths:
         - name: created_before
           in: query
           schema: { type: string, format: date-time }
-          description: 不传时间范围时框架层自动注入最近 90 天（§11.4.1）
+          description: RFC 3339。不传时间范围时默认最近 90 天；格式不对返回 400
       responses:
         "200":
           description: OK
@@ -245,7 +247,7 @@ components:
       properties:
         idempotency_key:
           type: string
-          description: 跨重试幂等键（§4.6），被调用方用唯一约束去重
+          description: 跨重试幂等键，被调用方先原子声明再执行，重复请求返回第一次的结果
         product_id: { type: string }
         warehouse_id: { type: string }
         qty: { type: string }
@@ -269,7 +271,7 @@ components:
           description: 带符号：正为盘盈，负为盘亏
         reason:
           type: string
-          description: 人类可读的调整原因，阶段二不接审批
+          description: 人类可读的调整原因（落进流水的 note）；调整不走审批
 
     AdjustResponse:
       type: object
