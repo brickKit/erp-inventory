@@ -1,0 +1,288 @@
+openapi: 3.1.0
+info:
+  title: erp/inventory user surface
+  version: 3.0.0
+  description: >-
+    Warehouses, receipts, movements and stock positions for people and the front end. Every route needs a platform
+    access token and the operation in x-operation; what the caller may not see answers 404 (warehouses, positions and
+    movements carry the legal entity and warehouse dimensions). Errors are application/problem+json with a reason.
+    Lists page by cursor only (protocol 14). Quantities are decimal strings in the product's base unit. Transfers,
+    adjustments, stock counts, locations and opening balances are in the contract but not in this version: they
+    answer CAPABILITY_UNSUPPORTED (D75). Reservation and issue are on the system surface (proto).
+paths:
+  /api/inventory/warehouses:
+    get:
+      operationId: listWarehouses
+      x-operation: erp.inventory.warehouse.read
+      parameters:
+        - {name: legal_entity_id, in: query, schema: {type: string, format: uuid}}
+        - {name: state, in: query, schema: {enum: [active, inactive]}}
+        - {name: q, in: query, schema: {type: string}, description: 'keyword over code and name'}
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: one page, by code
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [warehouses, next_cursor]
+                properties:
+                  warehouses: {type: array, items: {$ref: '#/components/schemas/Warehouse'}}
+                  next_cursor: {type: string}
+        default: {$ref: '#/components/responses/problem'}
+    post:
+      operationId: createWarehouse
+      x-operation: erp.inventory.warehouse.manage
+      summary: Create a warehouse in an active legal entity; needs an Idempotency-Key
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [legal_entity_id, code, name]
+              properties:
+                legal_entity_id: {type: string, format: uuid}
+                code: {type: string, pattern: '^[A-Z0-9][A-Z0-9_-]{0,31}$'}
+                name: {type: string, minLength: 1, maxLength: 200}
+      responses:
+        '200': {description: the warehouse, content: {application/json: {schema: {$ref: '#/components/schemas/Warehouse'}}}}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/warehouses/{id}:
+    parameters: [{$ref: '#/components/parameters/id'}]
+    get:
+      operationId: getWarehouse
+      x-operation: erp.inventory.warehouse.read
+      responses:
+        '200': {description: the warehouse, content: {application/json: {schema: {$ref: '#/components/schemas/Warehouse'}}}}
+        default: {$ref: '#/components/responses/problem'}
+    patch:
+      operationId: updateWarehouse
+      x-operation: erp.inventory.warehouse.manage
+      summary: Rename, deactivate or reactivate; with version, only that version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 200}
+                state: {enum: [active, inactive]}
+                version: {type: integer, minimum: 1}
+      responses:
+        '200': {description: the warehouse, content: {application/json: {schema: {$ref: '#/components/schemas/Warehouse'}}}}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/receipts:
+    post:
+      operationId: receive
+      x-operation: erp.inventory.movement.create
+      summary: >-
+        Receive stock into one warehouse (seed data and manual receipts in this version); needs an Idempotency-Key.
+        Only stocked products; serial-tracked products list exactly quantity serials, none of them in stock already.
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [warehouse_id, lines]
+              properties:
+                warehouse_id: {type: string, format: uuid}
+                business_date: {type: string, format: date, description: 'default: the legal entity''s today'}
+                note: {type: string, maxLength: 500}
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: {type: string, format: uuid}
+                      quantity: {$ref: '#/components/schemas/Quantity'}
+                      batch: {type: string, minLength: 1, maxLength: 64, description: required for batch-tracked products}
+                      serials: {type: array, items: {type: string, minLength: 1, maxLength: 64}}
+      responses:
+        '200':
+          description: the movements written
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [movements]
+                properties:
+                  movements: {type: array, items: {$ref: '#/components/schemas/Movement'}}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/movements:
+    get:
+      operationId: listMovements
+      x-operation: erp.inventory.movement.read
+      parameters:
+        - {name: product_id, in: query, schema: {type: string, format: uuid}}
+        - {name: warehouse_id, in: query, schema: {type: string, format: uuid}}
+        - {name: kind, in: query, schema: {enum: [receipt, issue]}}
+        - {name: from, in: query, schema: {type: string, format: date}, description: business date, inclusive}
+        - {name: to, in: query, schema: {type: string, format: date}, description: business date, inclusive}
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: one page, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [movements, next_cursor]
+                properties:
+                  movements: {type: array, items: {$ref: '#/components/schemas/Movement'}}
+                  next_cursor: {type: string}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/movements/{id}:
+    parameters: [{$ref: '#/components/parameters/id'}]
+    get:
+      operationId: getMovement
+      x-operation: erp.inventory.movement.read
+      responses:
+        '200': {description: the movement, content: {application/json: {schema: {$ref: '#/components/schemas/Movement'}}}}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/positions:
+    get:
+      operationId: listPositions
+      x-operation: erp.inventory.stock.read
+      parameters:
+        - {name: warehouse_id, in: query, schema: {type: string, format: uuid}}
+        - {name: product_id, in: query, schema: {type: string, format: uuid}}
+        - {name: available_only, in: query, schema: {type: boolean, default: false}, description: only available > 0}
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: one page, by warehouse then product
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [positions, next_cursor]
+                properties:
+                  positions: {type: array, items: {$ref: '#/components/schemas/Position'}}
+                  next_cursor: {type: string}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/lots:
+    get:
+      operationId: listLots
+      x-operation: erp.inventory.stock.read
+      parameters:
+        - {name: warehouse_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: product_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: the batches with stock, oldest receipt first (the FIFO order)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lots, next_cursor]
+                properties:
+                  lots:
+                    type: array
+                    items:
+                      type: object
+                      required: [batch, on_hand, first_received_at]
+                      properties:
+                        batch: {type: string}
+                        on_hand: {$ref: '#/components/schemas/Quantity'}
+                        first_received_at: {type: string, format: date-time}
+                  next_cursor: {type: string}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/serials:
+    get:
+      operationId: listSerials
+      x-operation: erp.inventory.stock.read
+      parameters:
+        - {name: product_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: warehouse_id, in: query, schema: {type: string, format: uuid}}
+        - {name: in_stock, in: query, schema: {type: boolean}}
+        - $ref: '#/components/parameters/cursor'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: one page, by serial
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [serials, next_cursor]
+                properties:
+                  serials:
+                    type: array
+                    items:
+                      type: object
+                      required: [serial, warehouse_id, in_stock]
+                      properties:
+                        serial: {type: string}
+                        warehouse_id: {type: string, format: uuid}
+                        in_stock: {type: boolean}
+                  next_cursor: {type: string}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/branches/{id}:
+    parameters: [{$ref: '#/components/parameters/id'}]
+    get:
+      operationId: getBranch
+      x-operation: erp.inventory.stock.read
+      responses:
+        '200': {description: the reservation branch, content: {application/json: {schema: {$ref: '#/components/schemas/Branch'}}}}
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/transfers:
+    post:
+      operationId: transfer
+      x-operation: erp.inventory.movement.create
+      summary: Move stock between two warehouses of one legal entity (not in this version, CAPABILITY_UNSUPPORTED)
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object}}}
+      responses:
+        default: {$ref: '#/components/responses/problem'}
+  /api/inventory/adjustments:
+    post:
+      operationId: adjust
+      x-operation: erp.inventory.adjustment.create
+      summary: Adjust stock after a count, with approval or permission (not in this version, CAPABILITY_UNSUPPORTED)
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object}}}
+      responses:
+        default: {$ref: '#/components/responses/problem'}
+components:
+  parameters:
+    id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    cursor: {name: cursor, in: query, schema: {type: string}}
+    limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+  responses:
+    problem:
+      description: an error (application/problem+json with reason)
+      content:
+        application/problem+json:
+          schema: {type: object, required: [reason], properties: {reason: {type: string}, detail: {type: string}}}
+  schemas:
+    Quantity: {type: string, pattern: '^[0-9]+(\.[0-9]+)?$', description: a decimal string in the product's base unit}
+    Warehouse: {$ref: 'events/erp.warehouse.changed.v1.schema.json'}
+    Position: {$ref: 'events/erp.stock_position.changed.v1.schema.json'}
+    Movement: {$ref: 'events/erp.inventory_movement.recorded.v1.schema.json'}
+    Branch: {$ref: 'events/erp.inventory_branch.changed.v1.schema.json'}

@@ -1,0 +1,209 @@
+// The system surface of erp/inventory: the participant commands of protocol 04 (reservation branches) and the stock
+// issue that consumes a branch. Coordinators (erp/sales) call it with their service identity; it never filters by a
+// user. Quantities are decimal strings in the product's base unit (protocol 14), never floats. The user surface is
+// REST (../../../../../openapi.yaml); the event payloads are ../../../../../events/.
+syntax = "proto3";
+
+package be.erp.inventory.v3;
+
+option go_package = "github.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3;inventoryv3";
+
+// ReservationService holds stock for one order confirmation as a branch (protocol 04). Every command carries the
+// branch ID the coordinator generated and is idempotent by it: the same ID and content answer the first result, the
+// same ID with other content is refused (RS17). A branch is consumed by StockService.Issue, not here.
+service ReservationService {
+  // Hold reserves all lines or none (RS16). A branch the coordinator cancelled before is a tombstone: a late Hold
+  // answers BRANCH_STATE_CANCELLED (RS04). Not enough stock answers BRANCH_STATE_REJECTED with the shortages.
+  rpc Hold(HoldRequest) returns (HoldResponse);
+  // Confirm turns a held branch into a committed one, which never expires; an expired branch is not revived.
+  rpc Confirm(ConfirmRequest) returns (ConfirmResponse);
+  // Cancel releases what the branch has not consumed; an unknown branch becomes a tombstone.
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+  // Query answers the branch as it is; an unknown branch answers BRANCH_STATE_ABSENT (and leaves no tombstone).
+  rpc Query(QueryRequest) returns (QueryResponse);
+  // Adjust applies an order revision (protocol 04); not in this version: CAPABILITY_UNSUPPORTED.
+  rpc Adjust(AdjustRequest) returns (AdjustResponse);
+}
+
+// StockService moves stock. Issue is idempotent by consumption_id.
+service StockService {
+  // Issue writes the issue movements and, when branch_id is set, consumes the branch in the same transaction
+  // (RS19). The whole issue is refused when any line cannot be issued; nothing is written then.
+  rpc Issue(IssueRequest) returns (IssueResponse);
+  // Positions answers on hand, reserved and available by product and warehouse; at most 500 pairs a call.
+  rpc Positions(PositionsRequest) returns (PositionsResponse);
+}
+
+enum BranchState {
+  BRANCH_STATE_UNSPECIFIED = 0;
+  BRANCH_STATE_HELD = 1;
+  BRANCH_STATE_COMMITTED = 2;
+  BRANCH_STATE_CONSUMED = 3;
+  BRANCH_STATE_RELEASED = 4;
+  BRANCH_STATE_EXPIRED = 5;
+  BRANCH_STATE_REJECTED = 6;
+  // the tombstone of a cancel that came before the hold
+  BRANCH_STATE_CANCELLED = 7;
+  // Query only: no such branch
+  BRANCH_STATE_ABSENT = 8;
+}
+
+// Reference names the coordinator's document; it is recorded, never interpreted.
+message Reference {
+  // e.g. "sales_order"
+  string kind = 1;
+  string id = 2;
+  // the document's revision the branch was made for
+  int64 revision = 3;
+}
+
+message HoldLine {
+  string product_id = 1;
+  string warehouse_id = 2;
+  // > 0, base unit; one line per product and warehouse (the coordinator merges its lines)
+  string quantity = 3;
+}
+
+message HoldRequest {
+  string branch_id = 1;
+  // every warehouse must belong to it
+  string legal_entity_id = 2;
+  Reference reference = 3;
+  repeated HoldLine lines = 4;
+}
+
+message ConfirmRequest {
+  string branch_id = 1;
+}
+
+message CancelRequest {
+  string branch_id = 1;
+}
+
+message QueryRequest {
+  string branch_id = 1;
+}
+
+message AdjustRequest {
+  string branch_id = 1;
+  int64 revision = 2;
+  repeated HoldLine lines = 3;
+}
+
+message BranchLine {
+  string product_id = 1;
+  string warehouse_id = 2;
+  string quantity = 3;
+  string consumed = 4;
+}
+
+// Shortage is a line a Hold could not reserve.
+message Shortage {
+  string product_id = 1;
+  string warehouse_id = 2;
+  string requested = 3;
+  // what was available when the hold was decided
+  string available = 4;
+  // insufficient, product_not_stocked, warehouse_not_found, warehouse_inactive, warehouse_not_in_legal_entity
+  string reason = 5;
+}
+
+// Branch is a branch as it is after the command (every ReservationService command answers it).
+message Branch {
+  string branch_id = 1;
+  BranchState state = 2;
+  // rejected: insufficient_stock or invalid_line (see shortages); otherwise empty
+  string reason = 3;
+  repeated Shortage shortages = 4;
+  repeated BranchLine lines = 5;
+  // RFC 3339; held only
+  string hold_expires_at = 6;
+  int64 version = 7;
+}
+
+message HoldResponse {
+  Branch branch = 1;
+}
+
+message ConfirmResponse {
+  Branch branch = 1;
+}
+
+message CancelResponse {
+  Branch branch = 1;
+}
+
+message QueryResponse {
+  Branch branch = 1;
+}
+
+message AdjustResponse {
+  Branch branch = 1;
+}
+
+message IssueLine {
+  string product_id = 1;
+  string warehouse_id = 2;
+  // > 0, base unit
+  string quantity = 3;
+  // batch-tracked products: the batch, or empty to allocate by receipt order (FIFO)
+  string batch = 4;
+  // serial-tracked products: exactly quantity serial numbers, required
+  repeated string serials = 5;
+  // the coordinator's line, recorded on the movement
+  string source_line_id = 6;
+}
+
+message IssueRequest {
+  // idempotency: the coordinator's delivery ID
+  string consumption_id = 1;
+  // the branch to consume; required in this version (an issue without a branch is not offered)
+  string branch_id = 2;
+  // the legal entity's business date of the issue (YYYY-MM-DD)
+  string business_date = 3;
+  Reference reference = 4;
+  repeated IssueLine lines = 5;
+}
+
+// IssueProblem is why one line could not be issued.
+message IssueProblem {
+  int32 line = 1;
+  // branch_not_committed, exceeds_branch, insufficient_batch, serial_required, serial_count_mismatch,
+  // serial_not_found, serial_not_in_stock, serial_in_other_warehouse
+  string reason = 2;
+  string detail = 3;
+}
+
+message IssueResponse {
+  string consumption_id = 1;
+  // true: issued (now or by the first call with this consumption_id)
+  bool issued = 2;
+  repeated string movement_ids = 3;
+  // the branch after the issue (consumed when nothing remains)
+  BranchState branch_state = 4;
+  // not issued: one or more problems; nothing was written
+  repeated IssueProblem problems = 5;
+}
+
+message PositionKey {
+  string product_id = 1;
+  string warehouse_id = 2;
+}
+
+message Position {
+  string product_id = 1;
+  string warehouse_id = 2;
+  string on_hand = 3;
+  string reserved = 4;
+  string available = 5;
+  int64 version = 6;
+}
+
+message PositionsRequest {
+  repeated PositionKey keys = 1;
+}
+
+message PositionsResponse {
+  // one per key, in order; a pair never moved answers zeros and version 0
+  repeated Position positions = 1;
+}

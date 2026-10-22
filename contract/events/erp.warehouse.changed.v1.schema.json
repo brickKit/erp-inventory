@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brickkit.dev/erp-inventory/events/erp.warehouse.changed.v1.schema.json",
+  "title": "erp.warehouse.changed.v1",
+  "description": "A warehouse (a full-state event); the record ID is its UUIDv7. A warehouse belongs to one legal entity; the code is unique in it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "legal_entity_id",
+    "code",
+    "name",
+    "state",
+    "version",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "legal_entity_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9_-]{0,31}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "state": {
+      "enum": [
+        "active",
+        "inactive"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brickkit.dev/erp-inventory/events/erp.inventory_movement.recorded.v1.schema.json",
+  "title": "erp.inventory_movement.recorded.v1",
+  "description": "A stock movement: an incremental fact that must not be missed (protocol 05, common rules). fact_id is the movement's ID; consumers dedupe by it. The two sequences are numbered after commit under lock, each in its own numbering transaction: inventory_seq over the whole inventory scope (protocol 06), valuation_seq per product and legal entity (protocol 05b). Movements never change; a correction is a reverse movement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "kind",
+    "product_id",
+    "warehouse_id",
+    "legal_entity_id",
+    "quantity",
+    "batch",
+    "serials",
+    "business_date",
+    "reference",
+    "branch_id",
+    "consumption_id",
+    "inventory_seq",
+    "valuation_seq",
+    "recorded_at"
+  ],
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "kind": {
+      "enum": [
+        "receipt",
+        "issue"
+      ],
+      "description": "later: transfer, adjustment, opening, sales_return, purchase_return"
+    },
+    "product_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "warehouse_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "legal_entity_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "quantity": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "> 0, base unit; the kind gives the direction"
+    },
+    "batch": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "serials": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "business_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "reference": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "integer"
+            },
+            "line_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "branch_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "consumption_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "inventory_seq": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "epoch",
+            "seq"
+          ],
+          "properties": {
+            "epoch": {
+              "type": "string",
+              "description": "<recovery generation>.<timeline> (protocol 14)"
+            },
+            "seq": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null only when read before numbering (the user surface); the event always carries it"
+    },
+    "valuation_seq": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "epoch",
+            "seq"
+          ],
+          "properties": {
+            "epoch": {
+              "type": "string",
+              "description": "<recovery generation>.<timeline> (protocol 14)"
+            },
+            "seq": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null only when read before numbering (the user surface); the event always carries it"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

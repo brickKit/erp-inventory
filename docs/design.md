@@ -62,25 +62,28 @@
 
 | 命令或查询 | 面 | 资源与操作 |
 | --- | --- | --- |
-| 预占、确认、取消、查询、消耗（协议 04 的参与方命令） | 系统面 `ReservationService` | `erp.inventory.system` 的 `erp.inventory.system.reserve`，只授予声明的协调者（`erp/sales`）的服务身份 |
-| 出库（带分支身份与消耗身份，明细可指定批次或序列号） | 系统面 `StockService.Issue` | `erp.inventory.system.issue`，同上 |
-| 余额、可用量、分支与流水的系统读取 | 系统面 | `erp.inventory.system.read` |
+| 预占、确认、取消、查询（协议 04 的参与方命令；消耗随出库） | 系统面 `ReservationService` | `erp.inventory.system` 的 `erp.inventory.system.reserve`，只授予声明的协调者（`erp/sales`）的服务身份 |
+| 出库并消耗分支（带分支身份与消耗身份，明细可指定批次或序列号） | 系统面 `StockService.Issue` | `erp.inventory.system.issue`，同上 |
+| 余额与可用量的系统读取（`StockService.Positions`） | 系统面 | `erp.inventory.system.read` |
 | 入库（本版给种子与手工收货用，带 `Idempotency-Key`） | 用户面 | `erp.inventory.movement` 的 `erp.inventory.movement.create` |
 | 流水列表与单条读取 | 用户面 | `erp.inventory.movement.read` |
 | 余额与可用量的列表 | 用户面 | `erp.inventory.stock` 的 `erp.inventory.stock.read` |
 | 仓库的维护与读取 | 用户面 | `erp.inventory.warehouse` 的 `erp.inventory.warehouse.manage`、`erp.inventory.warehouse.read` |
 | 分支的调整（订单修订，协议 04） | 系统面 `ReservationService` | 以后 |
 | 序号高点的读取与按序号补取（协议 06） | 系统面，只对成本组件开放 | 以后 |
-| 调拨、调整（需审批或权限）、盘点 | 用户面 | 以后 |
+| 调拨；调整（需审批或权限）；盘点 | 用户面 | 以后（契约已有调拨与调整的路径：`erp.inventory.movement.create`、`erp.inventory.adjustment.create`） |
 | 期初流水与已确认期初订单的期初分支（上线窗口，协议 16） | 系统面 | 以后 |
 
 用户面的资源带两个维度：法人（值集合，按仓库所属的法人）与仓库（值集合），支持“库管只看一个仓库”（安全 07）。确切的路径、字段与错误在 `contract/openapi.yaml` 与 `contract/proto/`；旧注册表里 2.x 的键（`erp.inventory.view` 等）随注册表的重新汇总退役。
 
 ## 事件
 
-- 流水：不可遗漏的增量事实（协议 05 的共同规则），带事实身份、库存流水序号与计价序号；供成本组件。
-- 余额：可覆盖的状态事件（产品 + 仓库的在库、已预占、可用）。
-- 预占分支的状态：可覆盖的状态事件。
+流 `erp.inventory`：
+
+- 流水 `erp.inventory_movement.recorded.v1`：不可遗漏的增量事实（协议 05 的共同规则），带事实身份、库存流水序号与计价序号；在编号事务里进发件表，所以总带着两个序号；供成本组件与产品（已有流水）。
+- 余额 `erp.stock_position.changed.v1`：可覆盖的状态事件（产品 + 仓库的在库、已预占、可用）。
+- 预占分支 `erp.inventory_branch.changed.v1`：可覆盖的状态事件。
+- 仓库 `erp.warehouse.changed.v1`：完整状态事件。
 
 ## 依赖
 

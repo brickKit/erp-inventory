@@ -1,0 +1,17 @@
+# Generated code is committed (make gen; make check runs gen-check). The plugin versions equal the runtimes the
+# SDKs lock: google.golang.org/protobuf v1.36.12 and grpc-go (be-sdk-go), protobuf 7.36.2 (protoc 36.2) and grpcio
+# 1.84.0 (be-sdk-python).
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.12
+    out: gen/go
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go:v1.6.2
+    out: gen/go
+    opt: paths=source_relative
+  - remote: buf.build/protocolbuffers/python:v36.2
+    out: python
+  - remote: buf.build/protocolbuffers/pyi:v36.2
+    out: python
+  - remote: buf.build/grpc/python:v1.84.0
+    out: python

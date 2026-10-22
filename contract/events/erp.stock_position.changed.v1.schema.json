@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brickkit.dev/erp-inventory/events/erp.stock_position.changed.v1.schema.json",
+  "title": "erp.stock_position.changed.v1",
+  "description": "The stock of one product in one warehouse (a full-state event, overwritable): on hand, reserved by held and committed branches, and available = on_hand - reserved.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "product_id",
+    "warehouse_id",
+    "legal_entity_id",
+    "on_hand",
+    "reserved",
+    "available",
+    "version",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "product_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "warehouse_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "legal_entity_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "on_hand": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "a non-negative decimal string, base unit"
+    },
+    "reserved": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "a non-negative decimal string, base unit"
+    },
+    "available": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "a non-negative decimal string, base unit"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
