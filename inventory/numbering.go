@@ -160,4 +160,3 @@ func (m *Module) Jobs(j *work.Jobs) error {
 		MaxAttempts: work.Unlimited, Handle: m.expireHolds})
 	return nil
 }
-

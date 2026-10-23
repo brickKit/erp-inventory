@@ -18,7 +18,9 @@ import (
 // refused carries the problems of an issue out of its transaction, which then rolls back: nothing is written.
 type refused struct{ problems []*inventoryv3.IssueProblem }
 
-func (r *refused) Error() string { return fmt.Sprintf("the issue is refused: %d problems", len(r.problems)) }
+func (r *refused) Error() string {
+	return fmt.Sprintf("the issue is refused: %d problems", len(r.problems))
+}
 
 // allocation is one movement an issue line becomes: a batch-tracked line may take several batches (FIFO).
 type allocation struct {
@@ -273,8 +275,9 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 	return resp, nil
 }
 
-// allocateBatches takes a named batch, or the batches oldest receipt first (FIFO, the replaceable allocation policy);
-// nil when they do not hold enough. The batches are locked in their key order.
+// allocateBatches takes a named batch, or the batches oldest receipt first (FIFO by the system time a batch number was
+// first received, the replaceable allocation policy); nil when they do not hold enough. The batch rows are locked in
+// that order, under the position's lock (lockPositions), so two issues never wait on each other's batches.
 func (m *Module) allocateBatches(ctx context.Context, tx db.Tx, i int, l *inventoryv3.IssueLine, qty string) ([]allocation, error) {
 	q := `SELECT batch, trim_scale(on_hand)::text FROM stock_lot WHERE product_id = $1 AND warehouse_id = $2 AND on_hand > 0`
 	args := []any{l.GetProductId(), l.GetWarehouseId()}

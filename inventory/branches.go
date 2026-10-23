@@ -352,42 +352,52 @@ func (m *Module) onBranch(ctx context.Context, id string, fn func(ctx context.Co
 	return wire(out), nil
 }
 
-// expireHolds releases held branches past their period, a batch a run; the row lock decides against a concurrent
-// confirm (whichever locks first wins, the other sees the result).
+// expireHolds releases held branches past their period, each in its own transaction; the row lock decides against a
+// concurrent confirm (whichever locks first wins, the other sees the result).
 func (m *Module) expireHolds(ctx context.Context, _ *work.Run) error {
 	for {
-		var n int
+		var due []string
 		err := m.rt.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
-			n = 0
+			due = due[:0]
 			rows, err := tx.Query(ctx, `SELECT id::text FROM branch WHERE state = 'held' AND hold_expires_at <= now()
-				ORDER BY hold_expires_at LIMIT 100 FOR UPDATE SKIP LOCKED`)
+				ORDER BY hold_expires_at LIMIT 100`)
 			if err != nil {
 				return err
 			}
-			var due []string
+			defer rows.Close()
 			for rows.Next() {
 				var id string
 				if err := rows.Scan(&id); err != nil {
-					rows.Close()
 					return err
 				}
 				due = append(due, id)
 			}
-			rows.Close()
-			for _, id := range due {
-				b, err := getBranch(ctx, tx, id, false)
-				if err != nil {
-					return err
-				}
-				if _, err := m.release(ctx, tx, b, "expired"); err != nil {
-					return err
-				}
-				n++
-			}
-			return nil
+			return rows.Err()
 		})
-		if err != nil || n < 100 {
+		if err != nil {
 			return err
+		}
+		// each in its own transaction, branch row then positions (RS16): one transaction for the batch would hold the
+		// positions of every branch released so far, out of the global order a concurrent hold or issue keeps
+		for _, id := range due {
+			if err := m.rt.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
+				b, err := getBranch(ctx, tx, id, true)
+				if err != nil || b.State != "held" {
+					return err
+				}
+				var past bool
+				if err := tx.QueryRow(ctx, `SELECT hold_expires_at <= now() FROM branch WHERE id = $1::uuid`, id).
+					Scan(&past); err != nil || !past {
+					return err
+				}
+				_, err = m.release(ctx, tx, b, "expired")
+				return err
+			}); err != nil {
+				return err
+			}
+		}
+		if len(due) < 100 {
+			return nil
 		}
 	}
 }

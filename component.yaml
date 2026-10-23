@@ -4,7 +4,7 @@ kind: Component
 metadata:
   id: erp/inventory
   name: Inventory
-  version: 3.0.1
+  version: 3.0.2
   description: "Warehouses, stock movements (the only writer) with the inventory and valuation sequences, positions with on hand, reserved and available, batches and serial numbers; the participant side of protocol 04's reservation branches and the issue that consumes them"
   repository: https://github.com/brickKit/erp-inventory
 
