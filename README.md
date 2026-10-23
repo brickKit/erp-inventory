@@ -6,7 +6,7 @@
 
 ## 在项目里使用
 
-在装配项目里 `brickkit add erp/inventory@<版本>`，再按 `BRICKKIT.md` 的“部署前准备”配置。
+在装配项目里 `brickkit add erp/inventory@<版本>`，再按 `BRICKKIT.md` 的“部署前准备”配置。种子数据：`make seed`（见 `cmd/seed`）。
 
 ## 文档
 

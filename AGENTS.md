@@ -17,6 +17,7 @@
 | `inventory/lists.go` | 用户面的列表；系统面的 `Positions` |
 | `inventory/records.go` | 记录的类型、读取与事件 |
 | `inventory/migrations/` | 表 |
+| `cmd/seed/` | 种子：角色与授予、四个法人的仓库（含停用的反例）、每个仓库的期初入库（批次、序列号、库存不足的反例）（`make seed`） |
 | `contract/` | 本组件发布的契约，单独的模块：`contract/proto/`、`contract/events/`、`contract/openapi.yaml` |
 | `docs/` | 设计与细则 |
 

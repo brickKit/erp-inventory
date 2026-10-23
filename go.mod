@@ -3,13 +3,14 @@ module github.com/brickKit/erp-inventory/v3
 go 1.27.0
 
 require (
-	github.com/brickKit/be-sdk-go/v3 v3.0.0-alpha.26
+	github.com/brickKit/be-sdk-go/v3 v3.0.0-alpha.32
 	github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.1
 	github.com/brickKit/mdm-org/contract/v3 v3.0.0-alpha.1
 	github.com/brickKit/mdm-product/contract/v3 v3.0.0-alpha.1
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
+	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -17,7 +18,7 @@ require (
 	github.com/MicahParks/jwkset v0.11.3 // indirect
 	github.com/MicahParks/keyfunc/v3 v3.8.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/brickKit/be-protocol/v3 v3.0.0-alpha.19 // indirect
+	github.com/brickKit/be-protocol/v3 v3.0.0-alpha.21 // indirect
 	github.com/brickKit/contract-infra-authz/v3 v3.0.0-alpha.1 // indirect
 	github.com/brickKit/infra-audit/contract/v3 v3.0.0-alpha.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
@@ -85,5 +86,4 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
-	google.golang.org/grpc v1.83.2 // indirect
 )
