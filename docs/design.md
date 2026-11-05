@@ -100,6 +100,8 @@
 
 ## 实现状态
 
+3.0.19（底层先行第 4 项 T10 的级联）：be-sdk-go alpha.92。整套恢复的核对（`CheckService`，操作 `erp.inventory.system.recover`，只许恢复工具调用）：SDK 自带的三项检查；仓库按版本、流水（不可变）按在不在答“还在不在”；业务变更的审计 `target` 带变更之后的版本（`audit.TargetOf`，流水没有版本）。预占分支与订单的对账由协调者 `erp/sales` 报告。清单的 `RECOVERY_PHASE` 加 `verifying`、`read_only`；依赖换到 T10 的新版本。
+
 3.0.18（底层先行第 4 项 T9 的级联）：be-sdk-go alpha.87（重放、恢复阶段 `replaying`、转发器停止时放弃租约）；清单的 `RECOVERY_PHASE` 加 `replaying`。依赖：mdm/org@3.0.17 → mdm/org@3.0.19 mdm/product@3.0.20 → mdm/product@3.0.21。
 
 3.0.17（底层先行第 4 项 T8 的级联）：be-sdk-go alpha.81（恢复模式、补发与消费者进度）；流的补发（`be.source.v1.ResendService`，操作 `erp.inventory.system.resend`，登记在本组件的 system 资源下，部署内任何组件可调用，线协议 P6.38）；清单声明 `RECOVERY_PHASE`。

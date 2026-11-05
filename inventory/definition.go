@@ -16,7 +16,7 @@ import (
 // Identity.
 const (
 	ID       = "erp/inventory"
-	Version  = "3.0.18"
+	Version  = "3.0.19"
 	GRPCPort = 9096
 )
 
@@ -51,7 +51,9 @@ const (
 	System         = "erp.inventory.system"
 	// OpResend is the redelivery of this component's stream (be-protocol P6.38: every component with streams serves
 	// it; any component of the deployment may call it).
-	OpResend     = "erp.inventory.system.resend"
+	OpResend = "erp.inventory.system.resend"
+	// OpRecover is a full recovery's checks (be-protocol chapter 14: the recovery tool only).
+	OpRecover    = "erp.inventory.system.recover"
 	OpSysRead    = "erp.inventory.system.read"
 	OpSysReserve = "erp.inventory.system.reserve"
 	OpSysIssue   = "erp.inventory.system.issue"
@@ -120,6 +122,7 @@ func Definitions() *sdkauthz.Definitions {
 			{Key: OpAdjustCreate, ResourceType: Movements, Purpose: "create", RiskClass: "high", SideEffects: []string{"business_write"}, Audit: true},
 			{Key: OpSysRead, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpResend, ResourceType: System, Purpose: "read", RiskClass: "low"},
+			{Key: OpRecover, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpSysReserve, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}},
 			{Key: OpSysIssue, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
 		}}
@@ -128,6 +131,6 @@ func Definitions() *sdkauthz.Definitions {
 // Definition is the component as the launcher and the shells take it.
 func Definition() component.Definition {
 	return component.Definition{ID: ID, Version: Version, Migrations: migrations(), GRPCPort: GRPCPort,
-		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(), Resend: OpResend,
+		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(), Resend: OpResend, Recovery: OpRecover,
 		New: func(rt *runtime.Runtime) (component.Module, error) { return New(rt) }}
 }

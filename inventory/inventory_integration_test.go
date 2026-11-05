@@ -421,6 +421,9 @@ func TestInventoryEndToEnd(t *testing.T) {
 	code, whs := bob.do("GET", "/api/inventory/warehouses", nil)
 	assert.Equal(t, 200, code)
 	assert.Empty(t, whs["warehouses"], "no warehouse read was granted: a list shows only what the caller may see")
+
+	t.Run("recovery checks", func(t *testing.T) { checksStory(t, w, admin, Warehouses, sh["id"].(string)) })
+	t.Run("recovery checks of a movement", func(t *testing.T) { movementPresent(t, w, admin) })
 }
 
 type lockedWriter struct {
