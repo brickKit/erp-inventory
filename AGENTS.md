@@ -7,6 +7,7 @@
 | 位置 | 内容 |
 | --- | --- |
 | `inventory/definition.go` | 组件定义：身份、依赖、流与事件类型、资源与操作、法人与仓库两个维度、暂存期限 |
+| `inventory/checks.go` | 整套恢复的核对（线协议第 14 章，SDK 的 `CheckService`，只许恢复工具调用）：本组件审计过的对象按版本答“还在不在”（`Presence`） |
 | `inventory/module.go` | 路由与系统面的注册、本组件的错误原因、取法人与产品（事务外） |
 | `inventory/warehouses.go` | 仓库的建立、修改、读取；`usableWarehouses` |
 | `inventory/stock.go` | 余额行的加锁顺序（`lockPositions`）与变动（`moveStock`） |
