@@ -16,7 +16,7 @@ import (
 // Identity.
 const (
 	ID       = "erp/inventory"
-	Version  = "3.0.16"
+	Version  = "3.0.17"
 	GRPCPort = 9096
 )
 
@@ -49,9 +49,12 @@ const (
 	OpMoveCreate   = "erp.inventory.movement.create"
 	OpAdjustCreate = "erp.inventory.adjustment.create"
 	System         = "erp.inventory.system"
-	OpSysRead      = "erp.inventory.system.read"
-	OpSysReserve   = "erp.inventory.system.reserve"
-	OpSysIssue     = "erp.inventory.system.issue"
+	// OpResend is the redelivery of this component's stream (be-protocol P6.38: every component with streams serves
+	// it; any component of the deployment may call it).
+	OpResend     = "erp.inventory.system.resend"
+	OpSysRead    = "erp.inventory.system.read"
+	OpSysReserve = "erp.inventory.system.reserve"
+	OpSysIssue   = "erp.inventory.system.issue"
 )
 
 // Dimensions of the user-surface resources (security 07): the legal entity and the warehouse.
@@ -116,6 +119,7 @@ func Definitions() *sdkauthz.Definitions {
 			{Key: OpMoveCreate, ResourceType: Movements, Purpose: "create", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
 			{Key: OpAdjustCreate, ResourceType: Movements, Purpose: "create", RiskClass: "high", SideEffects: []string{"business_write"}, Audit: true},
 			{Key: OpSysRead, ResourceType: System, Purpose: "read", RiskClass: "low"},
+			{Key: OpResend, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpSysReserve, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}},
 			{Key: OpSysIssue, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
 		}}
@@ -124,6 +128,6 @@ func Definitions() *sdkauthz.Definitions {
 // Definition is the component as the launcher and the shells take it.
 func Definition() component.Definition {
 	return component.Definition{ID: ID, Version: Version, Migrations: migrations(), GRPCPort: GRPCPort,
-		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(),
+		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(), Resend: OpResend,
 		New: func(rt *runtime.Runtime) (component.Module, error) { return New(rt) }}
 }
