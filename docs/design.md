@@ -100,6 +100,8 @@
 
 ## 实现状态
 
+3.0.29：代码按业务模块分层，行为不变：入口包 `inventory/` 只组装，业务在 `internal/` 下（`warehouses`、`stock`、`movements`、`numbering`、`branches`、`issue`、`masterdata`、`core`），集成测试在 `itest/`、按业务流程分文件；每个代码目录一份 `AGENTS.md`。
+
 3.0.28：be-sdk-go alpha.116（全系统同一个 SDK 版本；冷热数据：每天的孤儿清理、擦除作废导出、已销毁的记录从决定起答不存在、释放在事务之外读备份记录）
 
 3.0.27：be-sdk-go alpha.115（全系统同一个 SDK 版本；冷热数据：多层子表、叶子表的多列主键、text[]、部署时给保留期与选路线、标准管理路由、写屏障固定 search_path）

@@ -1,4 +1,4 @@
-package inventory
+package issue
 
 import (
 	"context"
@@ -7,6 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+
+	branches "github.com/brickKit/erp-inventory/v3/internal/branches"
+	core "github.com/brickKit/erp-inventory/v3/internal/core"
+	masterdata "github.com/brickKit/erp-inventory/v3/internal/masterdata"
+	movements "github.com/brickKit/erp-inventory/v3/internal/movements"
+	numbering "github.com/brickKit/erp-inventory/v3/internal/numbering"
+	stock "github.com/brickKit/erp-inventory/v3/internal/stock"
 
 	"github.com/brickKit/be-sdk-go/v3/db"
 	"github.com/brickKit/be-sdk-go/v3/grpcx"
@@ -31,26 +38,26 @@ type allocation struct {
 
 // Issue writes the issue movements and consumes the branch in one transaction (RS19); it is idempotent by
 // consumption_id, and the whole issue is refused when any line cannot be issued.
-func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inventoryv3.IssueResponse, error) {
+func Issue(m *core.Base, ctx context.Context, in *inventoryv3.IssueRequest) (*inventoryv3.IssueResponse, error) {
 	if in.GetConsumptionId() == "" || len(in.GetConsumptionId()) > 128 {
-		return nil, invalid("consumption_id", "consumption_id is the coordinator's delivery ID")
+		return nil, core.Invalid("consumption_id", "consumption_id is the coordinator's delivery ID")
 	}
-	if err := branchID(in.GetBranchId()); err != nil {
+	if err := branches.BranchID(in.GetBranchId()); err != nil {
 		return nil, err
 	}
-	if !dateForm.MatchString(in.GetBusinessDate()) {
-		return nil, invalid("business_date", "business_date is YYYY-MM-DD")
+	if !movements.DateForm.MatchString(in.GetBusinessDate()) {
+		return nil, core.Invalid("business_date", "business_date is YYYY-MM-DD")
 	}
-	if len(in.GetLines()) == 0 || len(in.GetLines()) > MaxBatch {
-		return nil, invalid("lines", fmt.Sprintf("1-%d lines", MaxBatch))
+	if len(in.GetLines()) == 0 || len(in.GetLines()) > core.MaxBatch {
+		return nil, core.Invalid("lines", fmt.Sprintf("1-%d lines", core.MaxBatch))
 	}
 	var pids []string
 	qty := make([]string, len(in.GetLines()))
 	for i, l := range in.GetLines() {
-		if !uuidForm.MatchString(l.GetProductId()) || !uuidForm.MatchString(l.GetWarehouseId()) {
-			return nil, invalid(fmt.Sprintf("lines[%d]", i), "product_id and warehouse_id are IDs")
+		if !core.UUIDForm.MatchString(l.GetProductId()) || !core.UUIDForm.MatchString(l.GetWarehouseId()) {
+			return nil, core.Invalid(fmt.Sprintf("lines[%d]", i), "product_id and warehouse_id are IDs")
 		}
-		q, err := quantity(fmt.Sprintf("lines[%d].quantity", i), l.GetQuantity())
+		q, err := core.Quantity(fmt.Sprintf("lines[%d].quantity", i), l.GetQuantity())
 		if err != nil {
 			return nil, err
 		}
@@ -60,10 +67,10 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 	body, _ := proto.MarshalOptions{Deterministic: true}.Marshal(in)
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])
-	products, perr := m.productsOf(ctx, pids)
+	products, perr := masterdata.ProductsOf(m, ctx, pids)
 	caller, _ := grpcx.Caller(ctx)
 	var resp *inventoryv3.IssueResponse
-	err := m.rt.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
+	err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
 		tag, err := tx.Exec(ctx, `INSERT INTO consumption (id, branch_id, content_digest, movement_ids)
 			VALUES ($1, $2, $3, '{}') ON CONFLICT (id) DO NOTHING`, in.GetConsumptionId(), in.GetBranchId(), digest)
 		if err != nil {
@@ -77,14 +84,14 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 				return err
 			}
 			if d != digest {
-				return errContent.New("consumption " + in.GetConsumptionId() + " was issued with other content")
+				return core.ErrContent.New("consumption " + in.GetConsumptionId() + " was issued with other content")
 			}
-			b, err := getBranch(ctx, tx, in.GetBranchId(), false)
+			b, err := core.GetBranch(ctx, tx, in.GetBranchId(), false)
 			if err != nil {
 				return err
 			}
 			resp = &inventoryv3.IssueResponse{ConsumptionId: in.GetConsumptionId(), Issued: true, MovementIds: moves,
-				BranchState: branchStates[b.State]}
+				BranchState: branches.BranchStates[b.State]}
 			return nil
 		}
 		if perr != nil {
@@ -94,8 +101,8 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 		problem := func(i int, reason, detail string) {
 			problems = append(problems, &inventoryv3.IssueProblem{Line: int32(i), Reason: reason, Detail: detail})
 		}
-		b, err := getBranch(ctx, tx, in.GetBranchId(), true)
-		if errors.Is(err, errNone) || err == nil && b.State != "committed" {
+		b, err := core.GetBranch(ctx, tx, in.GetBranchId(), true)
+		if errors.Is(err, core.ErrNone) || err == nil && b.State != "committed" {
 			problem(0, "branch_not_committed", "the branch is not committed: "+b.State)
 			return &refused{problems}
 		}
@@ -103,20 +110,20 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 			return err
 		}
 		// the branch's remaining quantity per product and warehouse, less what earlier lines of this issue take
-		remaining := map[key]string{}
+		remaining := map[stock.Key]string{}
 		for _, l := range b.Lines {
 			var r string
 			if err := tx.QueryRow(ctx, `SELECT trim_scale($1::numeric - $2::numeric)::text`, l.Quantity, l.Consumed).
 				Scan(&r); err != nil {
 				return err
 			}
-			remaining[key{l.ProductID, l.WarehouseID}] = r
+			remaining[stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}] = r
 		}
-		keys := make([]key, len(in.GetLines()))
+		keys := make([]stock.Key, len(in.GetLines()))
 		for i, l := range in.GetLines() {
-			keys[i] = key{l.GetProductId(), l.GetWarehouseId()}
+			keys[i] = stock.Key{Product: l.GetProductId(), Warehouse: l.GetWarehouseId()}
 		}
-		if _, err := lockPositions(ctx, tx, *b.LegalEntityID, keys); err != nil {
+		if _, err := stock.LockPositions(ctx, tx, *b.LegalEntityID, keys); err != nil {
 			return err
 		}
 		var allocs []allocation
@@ -125,7 +132,7 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 			rest, ok := remaining[k]
 			enough := false
 			if ok {
-				if enough, err = atLeast(ctx, tx, rest, qty[i]); err != nil {
+				if enough, err = stock.AtLeast(ctx, tx, rest, qty[i]); err != nil {
 					return err
 				}
 			}
@@ -139,7 +146,7 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 			}
 			remaining[k] = rest
 			p := products[l.GetProductId()]
-			if err := checkTracking("", p, qty[i], l.GetBatch(), l.GetSerials(), false); err != nil {
+			if err := movements.CheckTracking("", p, qty[i], l.GetBatch(), l.GetSerials(), false); err != nil {
 				reason := "serial_count_mismatch"
 				if p.Tracking == "serial" && len(l.GetSerials()) == 0 {
 					reason = "serial_required"
@@ -181,7 +188,7 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 				}
 				allocs = append(allocs, allocation{line: i, quantity: qty[i]})
 			case p.Tracking == "batch":
-				got, err := m.allocateBatches(ctx, tx, i, l, qty[i])
+				got, err := allocateBatches(m, ctx, tx, i, l, qty[i])
 				if err != nil {
 					return err
 				}
@@ -214,29 +221,29 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 			}
 			if _, err := tx.Exec(ctx, `INSERT INTO movement (id, kind, product_id, warehouse_id, legal_entity_id, quantity,
 				batch, serials, business_date, ref_kind, ref_id, ref_line_id, branch_id, consumption_id)
-				VALUES ($1, 'issue', $2, $3, $4, $5::numeric, $6, $7, $8::date, $9, $10, $11, $12, $13)`, id, k.product,
-				k.warehouse, *b.LegalEntityID, a.quantity, a.batch, serials, in.GetBusinessDate(),
+				VALUES ($1, 'issue', $2, $3, $4, $5::numeric, $6, $7, $8::date, $9, $10, $11, $12, $13)`, id, k.Product,
+				k.Warehouse, *b.LegalEntityID, a.quantity, a.batch, serials, in.GetBusinessDate(),
 				in.GetReference().GetKind(), in.GetReference().GetId(), lineID, b.ID, in.GetConsumptionId()); err != nil {
 				return err
 			}
 			if a.batch != nil {
 				if _, err := tx.Exec(ctx, `UPDATE stock_lot SET on_hand = on_hand - $4::numeric WHERE product_id = $1
-					AND warehouse_id = $2 AND batch = $3`, k.product, k.warehouse, *a.batch, a.quantity); err != nil {
+					AND warehouse_id = $2 AND batch = $3`, k.Product, k.Warehouse, *a.batch, a.quantity); err != nil {
 					return err
 				}
 			}
 			if len(serials) > 0 {
 				if _, err := tx.Exec(ctx, `UPDATE stock_serial SET in_stock = false, updated_at = now() WHERE product_id = $1
-					AND serial = ANY($2)`, k.product, serials); err != nil {
+					AND serial = ANY($2)`, k.Product, serials); err != nil {
 					return err
 				}
 			}
 			if _, err := tx.Exec(ctx, `UPDATE branch_line SET consumed = consumed + $4::numeric WHERE branch_id = $1
-				AND product_id = $2 AND warehouse_id = $3`, b.ID, k.product, k.warehouse, a.quantity); err != nil {
+				AND product_id = $2 AND warehouse_id = $3`, b.ID, k.Product, k.Warehouse, a.quantity); err != nil {
 				return err
 			}
 			// the issue takes what the branch held: on hand and reserved fall together, available stays
-			if err := m.moveStock(ctx, tx, k, neg(a.quantity), neg(a.quantity)); err != nil {
+			if err := stock.MoveStock(m, ctx, tx, k, stock.Neg(a.quantity), stock.Neg(a.quantity)); err != nil {
 				return err
 			}
 			moves = append(moves, id)
@@ -250,18 +257,18 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 		if !left {
 			state = "consumed"
 		}
-		if b, err = m.setState(ctx, tx, b.ID, state); err != nil {
+		if b, err = branches.SetState(m, ctx, tx, b.ID, state); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE consumption SET movement_ids = $2 WHERE id = $1`, in.GetConsumptionId(), moves); err != nil {
 			return err
 		}
-		if err := m.change(ctx, tx, caller, OpSysIssue, Movements, moves[0], map[string]any{"consumption_id": in.GetConsumptionId(),
+		if err := core.Change(m, ctx, tx, caller, core.OpSysIssue, core.Movements, moves[0], map[string]any{"consumption_id": in.GetConsumptionId(),
 			"branch_id": b.ID, "movements": moves}); err != nil {
 			return err
 		}
 		resp = &inventoryv3.IssueResponse{ConsumptionId: in.GetConsumptionId(), Issued: true, MovementIds: moves,
-			BranchState: branchStates[b.State]}
+			BranchState: branches.BranchStates[b.State]}
 		return nil
 	})
 	var r *refused
@@ -271,14 +278,14 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 	if err != nil {
 		return nil, err
 	}
-	m.numberNow(ctx)
+	numbering.NumberNow(m, ctx)
 	return resp, nil
 }
 
 // allocateBatches takes a named batch, or the batches oldest receipt first (FIFO by the system time a batch number was
 // first received, the replaceable allocation policy); nil when they do not hold enough. The batch rows are locked in
 // that order, under the position's lock (lockPositions), so two issues never wait on each other's batches.
-func (m *Module) allocateBatches(ctx context.Context, tx db.Tx, i int, l *inventoryv3.IssueLine, qty string) ([]allocation, error) {
+func allocateBatches(m *core.Base, ctx context.Context, tx db.Tx, i int, l *inventoryv3.IssueLine, qty string) ([]allocation, error) {
 	q := `SELECT batch, trim_scale(on_hand)::text FROM stock_lot WHERE product_id = $1 AND warehouse_id = $2 AND on_hand > 0`
 	args := []any{l.GetProductId(), l.GetWarehouseId()}
 	if l.GetBatch() != "" {

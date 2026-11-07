@@ -1,4 +1,4 @@
-package inventory
+package core
 
 import (
 	"context"
@@ -99,14 +99,14 @@ type Branch struct {
 	UpdatedAt     string       `json:"updated_at"`
 
 	Shortages []Shortage `json:"-"`
-	digest    *string
+	Digest    *string    `json:"-"`
 }
 
 const (
-	warehouseCols = `w.id::text, w.legal_entity_id::text, w.code, w.name, w.state, w.version, w.updated_at`
-	positionCols  = `s.id::text, s.product_id::text, s.warehouse_id::text, s.legal_entity_id::text, trim_scale(s.on_hand)::text,
+	WarehouseCols = `w.id::text, w.legal_entity_id::text, w.code, w.name, w.state, w.version, w.updated_at`
+	PositionCols  = `s.id::text, s.product_id::text, s.warehouse_id::text, s.legal_entity_id::text, trim_scale(s.on_hand)::text,
 		trim_scale(s.reserved)::text, trim_scale(s.on_hand - s.reserved)::text, s.version, s.updated_at`
-	movementCols = `m.id::text, m.kind, m.product_id::text, m.warehouse_id::text, m.legal_entity_id::text,
+	MovementCols = `m.id::text, m.kind, m.product_id::text, m.warehouse_id::text, m.legal_entity_id::text,
 		trim_scale(m.quantity)::text, m.batch, m.serials, m.business_date::text, m.ref_kind, m.ref_id, m.ref_line_id,
 		m.branch_id::text, m.consumption_id, m.inventory_epoch, m.inventory_seq, m.valuation_epoch, m.valuation_seq,
 		m.recorded_at`
@@ -117,7 +117,7 @@ const (
 			ORDER BY l.product_id, l.warehouse_id) FROM branch_line l WHERE l.branch_id = b.id), '[]'::jsonb)`
 )
 
-func scanWarehouse(row pgx.Row) (Warehouse, error) {
+func ScanWarehouse(row pgx.Row) (Warehouse, error) {
 	var w Warehouse
 	var at time.Time
 	err := row.Scan(&w.ID, &w.LegalEntityID, &w.Code, &w.Name, &w.State, &w.Version, &at)
@@ -125,7 +125,7 @@ func scanWarehouse(row pgx.Row) (Warehouse, error) {
 	return w, err
 }
 
-func scanPosition(row pgx.Row) (Position, error) {
+func ScanPosition(row pgx.Row) (Position, error) {
 	var p Position
 	var at time.Time
 	err := row.Scan(&p.ID, &p.ProductID, &p.WarehouseID, &p.LegalEntityID, &p.OnHand, &p.Reserved, &p.Available,
@@ -134,7 +134,7 @@ func scanPosition(row pgx.Row) (Position, error) {
 	return p, err
 }
 
-func scanMovement(row pgx.Row) (Movement, error) {
+func ScanMovement(row pgx.Row) (Movement, error) {
 	var m Movement
 	var refKind, refID, refLine, invEpoch, valEpoch *string
 	var invSeq, valSeq *int64
@@ -168,7 +168,7 @@ func scanBranch(row pgx.Row) (Branch, error) {
 	var shortages, lines []byte
 	var expires *time.Time
 	var at time.Time
-	err := row.Scan(&b.ID, &b.LegalEntityID, &refKind, &refID, &refRev, &b.State, &b.Reason, &shortages, &b.digest,
+	err := row.Scan(&b.ID, &b.LegalEntityID, &refKind, &refID, &refRev, &b.State, &b.Reason, &shortages, &b.Digest,
 		&expires, &b.Version, &at, &lines)
 	if err != nil {
 		return b, err
@@ -185,41 +185,41 @@ func scanBranch(row pgx.Row) (Branch, error) {
 }
 
 // errNone is a lookup that found no row.
-var errNone = errors.New("no such record")
+var ErrNone = errors.New("no such record")
 
-func one[T any](row pgx.Row, scan func(pgx.Row) (T, error)) (T, error) {
+func One[T any](row pgx.Row, scan func(pgx.Row) (T, error)) (T, error) {
 	v, err := scan(row)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return v, errNone
+		return v, ErrNone
 	}
 	return v, err
 }
 
-func getWarehouse(ctx context.Context, tx db.Tx, id string, lock bool) (Warehouse, error) {
-	q := `SELECT ` + warehouseCols + ` FROM warehouse w WHERE w.id = $1::uuid`
+func GetWarehouse(ctx context.Context, tx db.Tx, id string, lock bool) (Warehouse, error) {
+	q := `SELECT ` + WarehouseCols + ` FROM warehouse w WHERE w.id = $1::uuid`
 	if lock {
 		q += ` FOR UPDATE`
 	}
-	return one(tx.QueryRow(ctx, q, id), scanWarehouse)
+	return One(tx.QueryRow(ctx, q, id), ScanWarehouse)
 }
 
-func getBranch(ctx context.Context, tx db.Tx, id string, lock bool) (Branch, error) {
+func GetBranch(ctx context.Context, tx db.Tx, id string, lock bool) (Branch, error) {
 	if lock { // the row lock first: the aggregate column cannot take FOR UPDATE
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM branch WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
 			return Branch{}, err
 		}
 	}
-	return one(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branch b WHERE b.id = $1::uuid`, id), scanBranch)
+	return One(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branch b WHERE b.id = $1::uuid`, id), scanBranch)
 }
 
-func getPosition(ctx context.Context, tx db.Tx, productID, warehouseID string) (Position, error) {
-	return one(tx.QueryRow(ctx, `SELECT `+positionCols+` FROM stock_position s WHERE s.product_id = $1::uuid
-		AND s.warehouse_id = $2::uuid`, productID, warehouseID), scanPosition)
+func GetPosition(ctx context.Context, tx db.Tx, productID, warehouseID string) (Position, error) {
+	return One(tx.QueryRow(ctx, `SELECT `+PositionCols+` FROM stock_position s WHERE s.product_id = $1::uuid
+		AND s.warehouse_id = $2::uuid`, productID, warehouseID), ScanPosition)
 }
 
-// emit writes a full-state event into the outbox, in the transaction that changed the record (protocol 02, S2).
-func (m *Module) emit(ctx context.Context, tx db.Tx, typ, id string, version int64, data any) error {
-	_, err := m.rt.Events.Emit(ctx, tx, Stream, events.Event{Type: typ, RecordID: id, Version: version,
+// Emit writes a full-state event into the outbox, in the transaction that changed the record (protocol 02, S2).
+func Emit(m *Base, ctx context.Context, tx db.Tx, typ, id string, version int64, data any) error {
+	_, err := m.RT.Events.Emit(ctx, tx, Stream, events.Event{Type: typ, RecordID: id, Version: version,
 		Projection: events.Full, Data: data})
 	return err
 }

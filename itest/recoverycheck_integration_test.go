@@ -1,11 +1,13 @@
 //go:build integration
 
-package inventory
+package itest
 
 import (
 	"context"
 	"strconv"
 	"testing"
+
+	core "github.com/brickKit/erp-inventory/v3/internal/core"
 
 	"github.com/brickKit/be-sdk-go/v3/ids"
 	"github.com/brickKit/be-sdk-go/v3/recoverypb"
@@ -25,7 +27,7 @@ import (
 func checksStory(t *testing.T, w *sectest.World, admin *pgx.Conn, typ, id string) {
 	ctx := context.Background()
 	dial := func(as string) recoverypb.CheckServiceClient {
-		conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, as).ClientConfig(ID))))
+		conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, as).ClientConfig(core.ID))))
 		require.NoError(t, err)
 		t.Cleanup(func() { conn.Close() })
 		return recoverypb.NewCheckServiceClient(conn)
@@ -58,12 +60,19 @@ func movementPresent(t *testing.T, w *sectest.World, admin *pgx.Conn) {
 	ctx := context.Background()
 	var id string
 	require.NoError(t, admin.QueryRow(ctx, "SELECT id::text FROM "+itSchema+".movement LIMIT 1").Scan(&id))
-	conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, "ops/recover").ClientConfig(ID))))
+	conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, "ops/recover").ClientConfig(core.ID))))
 	require.NoError(t, err)
 	defer conn.Close()
 	got, err := recoverypb.NewCheckServiceClient(conn).Present(ctx, &recoverypb.PresentRequest{Recovery: "r",
-		Objects: []*recoverypb.ObjectRef{{Type: Movements, Id: id}, {Type: Movements, Id: ids.New().String()}}})
+		Objects: []*recoverypb.ObjectRef{{Type: core.Movements, Id: id}, {Type: core.Movements, Id: ids.New().String()}}})
 	require.NoError(t, err)
 	assert.Equal(t, "present", got.GetAnswers()[0].GetAnswer())
 	assert.Equal(t, "absent", got.GetAnswers()[1].GetAnswer())
+}
+
+// recoveryChecks: a full recovery's checks against this member, for a warehouse and a movement.
+func (fx *fixture) recoveryChecks() {
+	t := fx.t
+	t.Run("recovery checks", func(t *testing.T) { checksStory(t, fx.w, fx.admin, core.Warehouses, fx.whSH) })
+	t.Run("recovery checks of a movement", func(t *testing.T) { movementPresent(t, fx.w, fx.admin) })
 }

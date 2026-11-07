@@ -1,12 +1,13 @@
-package inventory
+package numbering
 
 import (
 	"context"
 	"time"
 
+	core "github.com/brickKit/erp-inventory/v3/internal/core"
+
 	"github.com/brickKit/be-sdk-go/v3/db"
 	"github.com/brickKit/be-sdk-go/v3/events"
-	"github.com/brickKit/be-sdk-go/v3/work"
 )
 
 // Limits of a numbering transaction (the same as the SDK's outbox numbering, P6.5).
@@ -38,9 +39,9 @@ func counter(ctx context.Context, tx db.Tx, scope, k string) (epoch string, last
 
 // numberInventory gives the visible movements without an inventory sequence their numbers, in insertion order, under
 // the inventory counter's lock (protocol 02, step 2: the statement after the lock sees every committed row).
-func (m *Module) numberInventory(ctx context.Context) (int, error) {
+func numberInventory(m *core.Base, ctx context.Context) (int, error) {
 	var n int
-	err := m.rt.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
+	err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
 		epoch, last, err := counter(ctx, tx, "inventory", "")
 		if err != nil {
 			return err
@@ -63,9 +64,9 @@ func (m *Module) numberInventory(ctx context.Context) (int, error) {
 
 // numberValuation gives the movements that have an inventory sequence their valuation sequence per product and legal
 // entity (protocol 05b), and writes each movement's event in that transaction: the event carries both sequences.
-func (m *Module) numberValuation(ctx context.Context) (int, error) {
+func numberValuation(m *core.Base, ctx context.Context) (int, error) {
 	var n int
-	err := m.rt.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
+	err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
 		n = 0
 		rows, err := tx.Query(ctx, `SELECT DISTINCT product_id::text, legal_entity_id::text FROM movement
 			WHERE inventory_seq IS NOT NULL AND valuation_seq IS NULL ORDER BY 1, 2 LIMIT 50`)
@@ -111,11 +112,11 @@ func (m *Module) numberValuation(ctx context.Context) (int, error) {
 				return err
 			}
 			for _, id := range ids {
-				mv, err := one(tx.QueryRow(ctx, `SELECT `+movementCols+` FROM movement m WHERE m.id = $1::uuid`, id), scanMovement)
+				mv, err := core.One(tx.QueryRow(ctx, `SELECT `+core.MovementCols+` FROM movement m WHERE m.id = $1::uuid`, id), core.ScanMovement)
 				if err != nil {
 					return err
 				}
-				if _, err := m.rt.Events.Emit(ctx, tx, Stream, events.Event{Type: MovementRecorded, RecordID: mv.FactID,
+				if _, err := m.RT.Events.Emit(ctx, tx, core.Stream, events.Event{Type: core.MovementRecorded, RecordID: mv.FactID,
 					Version: 1, Projection: events.Full, Data: mv, LegalEntity: mv.LegalEntityID}); err != nil {
 					return err
 				}
@@ -127,14 +128,14 @@ func (m *Module) numberValuation(ctx context.Context) (int, error) {
 	return n, err
 }
 
-// number runs both numberings until nothing is left.
-func (m *Module) number(ctx context.Context) error {
+// Number runs both numberings until nothing is left.
+func Number(m *core.Base, ctx context.Context) error {
 	for {
-		a, err := m.numberInventory(ctx)
+		a, err := numberInventory(m, ctx)
 		if err != nil {
 			return err
 		}
-		b, err := m.numberValuation(ctx)
+		b, err := numberValuation(m, ctx)
 		if err != nil {
 			return err
 		}
@@ -144,19 +145,10 @@ func (m *Module) number(ctx context.Context) error {
 	}
 }
 
-// numberNow numbers right after a commit so the movement events go out at once; a failure is left to the numbering
+// NumberNow numbers right after a commit so the movement events go out at once; a failure is left to the numbering
 // job, which runs every second.
-func (m *Module) numberNow(ctx context.Context) {
-	if err := m.number(context.WithoutCancel(ctx)); err != nil {
-		m.rt.Logger.Warn("numbering movements after commit failed; the numbering job retries", "error", err)
+func NumberNow(m *core.Base, ctx context.Context) {
+	if err := Number(m, context.WithoutCancel(ctx)); err != nil {
+		m.RT.Logger.Warn("numbering movements after commit failed; the numbering job retries", "error", err)
 	}
-}
-
-// Jobs declares the background work: the numbering of movements and the expiry of holds (protocol 01).
-func (m *Module) Jobs(j *work.Jobs) error {
-	j.Add(work.Job{Name: "number-movements", Kind: work.Singleton, Effect: work.Local, Interval: time.Second,
-		MaxAttempts: work.Unlimited, Handle: func(ctx context.Context, _ *work.Run) error { return m.number(ctx) }})
-	j.Add(work.Job{Name: "expire-holds", Kind: work.Singleton, Effect: work.Local, Interval: 10 * time.Second,
-		MaxAttempts: work.Unlimited, Handle: m.expireHolds})
-	return nil
 }

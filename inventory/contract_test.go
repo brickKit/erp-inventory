@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	core "github.com/brickKit/erp-inventory/v3/internal/core"
+
 	"github.com/brickKit/be-sdk-go/v3/httpx"
 	"github.com/brickKit/be-sdk-go/v3/launcher"
 	"github.com/brickKit/be-sdk-go/v3/mergesafety"
@@ -47,15 +49,15 @@ func TestThePayloadsFitTheirSchemas(t *testing.T) {
 	at := "2026-10-20T08:00:00.000000Z"
 	reason := "insufficient_stock"
 	for typ, v := range map[string]any{
-		WarehouseChanged: Warehouse{ID: wh, LegalEntityID: le, Code: "SH-01", Name: "上海一号仓", State: "active", Version: 1, UpdatedAt: at},
-		PositionChanged: Position{ID: "01a15ab0-0000-7000-8000-0000000000d1", ProductID: pr, WarehouseID: wh, LegalEntityID: le,
+		core.WarehouseChanged: core.Warehouse{ID: wh, LegalEntityID: le, Code: "SH-01", Name: "上海一号仓", State: "active", Version: 1, UpdatedAt: at},
+		core.PositionChanged: core.Position{ID: "01a15ab0-0000-7000-8000-0000000000d1", ProductID: pr, WarehouseID: wh, LegalEntityID: le,
 			OnHand: "12.5", Reserved: "2", Available: "10.5", Version: 3, UpdatedAt: at},
-		MovementRecorded: Movement{FactID: "01a15ab0-0000-7000-8000-0000000000d2", Kind: "issue", ProductID: pr, WarehouseID: wh,
+		core.MovementRecorded: core.Movement{FactID: "01a15ab0-0000-7000-8000-0000000000d2", Kind: "issue", ProductID: pr, WarehouseID: wh,
 			LegalEntityID: le, Quantity: "2", Batch: &batch, Serials: []string{}, BusinessDate: "2026-10-20",
-			Reference: &Reference{Kind: "sales_order", ID: "SO-1", LineID: &line}, BranchID: &branch, ConsumptionID: &line,
-			InventorySeq: &Seq{Epoch: "1.1", Seq: 7}, ValuationSeq: &Seq{Epoch: "1.1", Seq: 3}, RecordedAt: at},
-		BranchChanged: Branch{ID: branch, LegalEntityID: &le, Reference: &Reference{Kind: "sales_order", ID: "SO-1", Revision: &rev},
-			State: "rejected", Reason: &reason, Lines: []BranchLine{{ProductID: pr, WarehouseID: wh, Quantity: "3", Consumed: "0"}},
+			Reference: &core.Reference{Kind: "sales_order", ID: "SO-1", LineID: &line}, BranchID: &branch, ConsumptionID: &line,
+			InventorySeq: &core.Seq{Epoch: "1.1", Seq: 7}, ValuationSeq: &core.Seq{Epoch: "1.1", Seq: 3}, RecordedAt: at},
+		core.BranchChanged: core.Branch{ID: branch, LegalEntityID: &le, Reference: &core.Reference{Kind: "sales_order", ID: "SO-1", Revision: &rev},
+			State: "rejected", Reason: &reason, Lines: []core.BranchLine{{ProductID: pr, WarehouseID: wh, Quantity: "3", Consumed: "0"}},
 			Version: 1, UpdatedAt: at},
 	} {
 		c := jsonschema.NewCompiler()
@@ -68,9 +70,9 @@ func TestThePayloadsFitTheirSchemas(t *testing.T) {
 		assert.NoError(t, s.Validate(doc), typ)
 	}
 	// a tombstone: a cancel before the hold
-	tomb, _ := json.Marshal(Branch{ID: branch, State: "cancelled", Lines: []BranchLine{}, Version: 1, UpdatedAt: at})
+	tomb, _ := json.Marshal(core.Branch{ID: branch, State: "cancelled", Lines: []core.BranchLine{}, Version: 1, UpdatedAt: at})
 	c := jsonschema.NewCompiler()
-	s, err := c.Compile("../contract/events/" + BranchChanged + ".schema.json")
+	s, err := c.Compile("../contract/events/" + core.BranchChanged + ".schema.json")
 	require.NoError(t, err)
 	doc, _ := jsonschema.UnmarshalJSON(bytes.NewReader(tomb))
 	assert.NoError(t, s.Validate(doc), "tombstone")

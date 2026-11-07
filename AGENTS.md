@@ -4,39 +4,44 @@
 
 ## 代码地图
 
-| 位置 | 内容 |
+代码按业务模块分层。**先读这一节，再进目录**：每个代码目录都有自己的 `AGENTS.md`（同目录的 `CLAUDE.md` 让 Claude Code 读这个目录的文件时自动带上它），写这一层负责什么、不负责什么、每个文件、依赖谁、测在哪。
+
+| 目录 | 是什么 |
 | --- | --- |
-| `inventory/definition.go` | 组件定义：身份、依赖、流与事件类型、资源与操作、法人与仓库两个维度、暂存期限 |
-| `inventory/checks.go` | 整套恢复的核对（线协议第 14 章，SDK 的 `CheckService`，只许恢复工具调用）：本组件审计过的对象按版本答“还在不在”（`Presence`） |
-| `inventory/module.go` | 路由与系统面的注册、本组件的错误原因、取法人与产品（事务外） |
-| `inventory/warehouses.go` | 仓库的建立、修改、读取；`usableWarehouses` |
-| `inventory/stock.go` | 余额行的加锁顺序（`lockPositions`）与变动（`moveStock`） |
-| `inventory/receipts.go` | 入库、追踪政策的检查（`checkTracking`）、流水的读取 |
-| `inventory/branches.go` | 预占分支：`Hold`、`Confirm`、`Cancel`、`Query`，释放（`release`），暂存到期的工作项 |
-| `inventory/issue.go` | 出库并消耗分支（`Issue`），批次的先进先出分配（`allocateBatches`） |
-| `inventory/numbering.go` | 两个序号的提交后编号与流水事件；后台工作的声明（`Jobs`） |
-| `inventory/lists.go` | 用户面的列表；系统面的 `Positions` |
-| `inventory/records.go` | 记录的类型、读取与事件 |
+| [`inventory/`](inventory/AGENTS.md) | 入口：组件定义与组装（路由、系统面、后台工作、恢复核对都在这里登记，转给业务模块）；不写业务。`main.go` 与外壳只引用它 |
+| [`internal/`](internal/AGENTS.md) | 业务：下面的模块各一个包；模块之间的依赖表在它的 `AGENTS.md` |
+| [`itest/`](itest/AGENTS.md) | 集成测试，按业务流程分文件；它的 `AGENTS.md` 是测试索引 |
 | `inventory/migrations/` | 表 |
 | `cmd/seed/` | 种子：角色与授予、四个法人的仓库（含停用的反例）、每个仓库的期初入库（批次、序列号、库存不足的反例）（`make seed`） |
 | `contract/` | 本组件发布的契约，单独的模块：`contract/proto/`、`contract/events/`、`contract/openapi.yaml` |
 | `docs/` | 设计与细则 |
 
+业务模块（`internal/` 下）：
+
+| 模块 | 负责 | 拥有的表 |
+| --- | --- | --- |
+| [`warehouses`](internal/warehouses/AGENTS.md) | 仓库：建立、修改、读取、列表；能不能用 | `warehouse` |
+| [`stock`](internal/stock/AGENTS.md) | 余额：加锁顺序与变动（在库、已预占）、批次与序列号、余额与批次与序列号的列表、系统面的 `Positions` | `stock_position`、`stock_lot`、`stock_serial` |
+| [`movements`](internal/movements/AGENTS.md) | 入库、追踪政策的检查、流水的读取与列表 | `movement` |
+| [`numbering`](internal/numbering/AGENTS.md) | 两个序号的提交后编号与流水事件 | `seq_counter` |
+| [`branches`](internal/branches/AGENTS.md) | 预占分支（协议 04，本组件是参与方）：预占、确认、取消、查询、暂存到期 | `branch`、`branch_line` |
+| [`issue`](internal/issue/AGENTS.md) | 出库并消耗分支、批次的先进先出分配 | `consumption` |
+
+共用的：[`masterdata`](internal/masterdata/AGENTS.md)（事务外向 `mdm/org`、`mdm/product` 取证）、[`core`](internal/core/AGENTS.md)（名字与资源定义、校验、审计与事件的写法、记录的类型与读取、列表的共用部分）。
+
 | 想改 | 从这里开始 | 然后 |
 | --- | --- | --- |
-| 可用量、预占、取消的规则 | `docs/rules/availability.md` 的表 | `branches.go`、集成测试的预占一段 |
-| 出库的规则（批次、序列号、整笔拒绝） | `docs/rules/availability.md` 的批次与序列号 | `issue.go` |
-| 分配策略（先进先出之外的，例如按到期） | `issue.go` 的 `allocateBatches` | 设计的“部署与替换” |
-| 序号与流水事件 | `numbering.go` | 协议 05b、06 |
-| 一个维度、一个操作 | `definition.go` | `docs/design.md` 的命令与查询、`BRICKKIT.md` 的契约索引 |
+| 可用量、预占、取消的规则 | `docs/rules/availability.md` 的表 | `internal/branches`；`itest/branches_integration_test.go` |
+| 出库的规则（批次、序列号、整笔拒绝） | `docs/rules/availability.md` 的批次与序列号 | `internal/issue`；`itest/issue_integration_test.go` |
+| 分配策略（先进先出之外的，例如按到期） | `internal/issue` 的 `allocateBatches` | 设计的“部署与替换” |
+| 序号与流水事件 | `internal/numbering` | 协议 05b、06；`itest/movements_integration_test.go` 的 `numbering` |
+| 一个维度、一个操作 | `internal/core/names.go` | `docs/design.md` 的命令与查询、`BRICKKIT.md` 的契约索引；路由的登记在 `inventory/module.go` |
 | 加字段、加接口、改事件 | 装配项目 be-assembly-standard 规范里的“改动配方” | `docs/design.md` 的数据与命令 |
 
 ## 构建与测试
 
 - `go test ./...`（`make test`）：清单的 `configSchema` 与 `events`、OpenAPI 与路由、事件载荷、合并安全。
-- `go test -tags integration ./inventory/`（`make test-integration`）：真实的 PostgreSQL 与消息系统，例如 `BE_SDK_TEST_PG_ADMIN=postgres://postgres:<口令>@localhost:5432/brickkit_test_db`（口令是装配项目 `.env` 的 `POSTGRES_PASSWORD`）与 `BE_SDK_TEST_NATS_URL=nats://localhost:4222`；be-sdk-go 的 `sectest` 是测试部署；`mdm/org` 与 `mdm/product` 是按契约写的替身，测试自己以 `erp/sales` 的身份调用系统面。
-- 集成测试的前提：装配项目里 `make up` 起了 `be-postgres` 与 `be-nats`；`be-postgres` 里有库 `brickkit_test_db`（没有就 `docker exec be-postgres createdb -U postgres brickkit_test_db`）；测试每次开始时删掉再建自己的 schema `erp_inventory_it`，跑完留着；端口 28086、9096 与替身的 19097、19098 要空着，被占时测试直接失败。
-- 授权视图是定期取的：测试中途加的授予要等下一次取到（集成测试用 `Eventually`）。
+- `make test-integration`（`go test -tags integration ./itest/`）：真实的 PostgreSQL 与消息系统；每个文件测哪条流程、要什么前提，在 [itest/AGENTS.md](itest/AGENTS.md)。
 - `brickkit lint`
 
 ## 设计取舍
@@ -48,9 +53,9 @@
 
 ## 易错点
 
-- 不要在事务里调 `mdm/product` 或 `mdm/org`：先取（`productsOf`、`legalEntityOf`），再开事务。
-- 列表能排序、筛选的字段必须在资源定义的字段里声明（`definition.go`），否则 SDK 答 `FIELD_NOT_QUERYABLE`。
-- 不要用浮点算数量：比较与加减在 SQL 里做（`atLeast`、`trim_scale`）。
+- 不要在事务里调 `mdm/product` 或 `mdm/org`：先取（`internal/masterdata`），再开事务。
+- 列表能排序、筛选的字段必须在资源定义的字段里声明（`internal/core/names.go`），否则 SDK 答 `FIELD_NOT_QUERYABLE`。
+- 不要用浮点算数量：比较与加减在 SQL 里做（`stock.AtLeast`、`trim_scale`）。
 
 ## 改代码前自查
 
