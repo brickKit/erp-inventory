@@ -78,10 +78,14 @@ func TestThePayloadsFitTheirSchemas(t *testing.T) {
 	assert.NoError(t, s.Validate(doc), "tombstone")
 }
 
-// TestTheModuleIsMergeSafe: the module is compiled into the Go core shell.
+// TestTheModuleIsMergeSafe: the module is compiled into the Go core shell: the entry package and every business
+// module under internal/.
 func TestTheModuleIsMergeSafe(t *testing.T) {
 	findings, err := mergesafety.CheckDir(".")
 	require.NoError(t, err)
+	inner, err := mergesafety.CheckTree("../internal")
+	require.NoError(t, err)
+	findings = append(findings, inner...)
 	for _, f := range findings {
 		t.Errorf("%v", f)
 	}
