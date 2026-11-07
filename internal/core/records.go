@@ -110,11 +110,13 @@ const (
 		trim_scale(m.quantity)::text, m.batch, m.serials, m.business_date::text, m.ref_kind, m.ref_id, m.ref_line_id,
 		m.branch_id::text, m.consumption_id, m.inventory_epoch, m.inventory_seq, m.valuation_epoch, m.valuation_seq,
 		m.recorded_at`
-	branchCols = `b.id::text, b.legal_entity_id::text, b.ref_kind, b.ref_id, b.ref_revision, b.state, b.reason, b.shortages,
-		b.content_digest, b.hold_expires_at, b.version, b.updated_at,
+	// a branch is the SDK's participant record (be_reserve_branch: state, reason, digest, hold period, version, times)
+	// with what it takes here (branch and its lines; none on a tombstone)
+	branchCols = `r.id::text, b.legal_entity_id::text, b.ref_kind, b.ref_id, b.ref_revision, r.state, r.reason,
+		COALESCE(b.shortages, '[]'::jsonb), r.content_digest, r.hold_expires_at, r.version, r.updated_at,
 		COALESCE((SELECT jsonb_agg(jsonb_build_object('product_id', l.product_id::text, 'warehouse_id', l.warehouse_id::text,
 			'quantity', trim_scale(l.quantity)::text, 'consumed', trim_scale(l.consumed)::text)
-			ORDER BY l.product_id, l.warehouse_id) FROM branch_line l WHERE l.branch_id = b.id), '[]'::jsonb)`
+			ORDER BY l.product_id, l.warehouse_id) FROM branch_line l WHERE l.branch_id = r.id), '[]'::jsonb)`
 )
 
 func ScanWarehouse(row pgx.Row) (Warehouse, error) {
@@ -203,13 +205,10 @@ func GetWarehouse(ctx context.Context, tx db.Tx, id string, lock bool) (Warehous
 	return One(tx.QueryRow(ctx, q, id), ScanWarehouse)
 }
 
-func GetBranch(ctx context.Context, tx db.Tx, id string, lock bool) (Branch, error) {
-	if lock { // the row lock first: the aggregate column cannot take FOR UPDATE
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM branch WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
-			return Branch{}, err
-		}
-	}
-	return One(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM branch b WHERE b.id = $1::uuid`, id), scanBranch)
+// GetBranch reads a branch; its lock is the SDK's (reserve), taken after the branch's positions.
+func GetBranch(ctx context.Context, tx db.Tx, id string) (Branch, error) {
+	return One(tx.QueryRow(ctx, `SELECT `+branchCols+` FROM be_reserve_branch r LEFT JOIN branch b ON b.id = r.id
+		WHERE r.id = $1::uuid`, id), scanBranch)
 }
 
 func GetPosition(ctx context.Context, tx db.Tx, productID, warehouseID string) (Position, error) {

@@ -16,6 +16,7 @@
 | `services.go` | gRPC 方法 `Hold`、`Confirm`、`Cancel`、`Query`、`Adjust` 转给 `internal/branches`，`Issue` 转给 `internal/issue`，`Positions` 转给 `internal/stock` |
 | `checks.go` | 整套恢复的核对：仓库、流水等按版本答“还在不在” |
 | `contract_test.go` | 单元测试：清单的 `configSchema` 与 `events`、OpenAPI 与路由一一对应、事件载荷合乎 schema、合并安全 |
+| `structure_test.go` | 单元测试：`internal/` 里没有写 SDK 分支表（`be_reserve_branch`、`be_reserve_consumption`）的 SQL |
 | `migrations/` | 表 |
 
 ## 依赖与被依赖

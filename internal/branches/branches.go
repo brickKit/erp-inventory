@@ -18,6 +18,7 @@ import (
 	"github.com/brickKit/be-sdk-go/v3/db"
 	"github.com/brickKit/be-sdk-go/v3/errs"
 	"github.com/brickKit/be-sdk-go/v3/httpx"
+	"github.com/brickKit/be-sdk-go/v3/reserve"
 	"github.com/brickKit/be-sdk-go/v3/work"
 	inventoryv3 "github.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3"
 )
@@ -108,177 +109,193 @@ func Hold(m *core.Base, ctx context.Context, in *inventoryv3.HoldRequest) (*inve
 	digest := holdContent(in, lines)
 	// The products before the transaction (no call inside one); a hold seen before answers without them.
 	products, perr := masterdata.ProductsOf(m, ctx, pids)
-	var out core.Branch
+	var out *inventoryv3.Branch
 	err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
-		tag, err := tx.Exec(ctx, `INSERT INTO branch (id, state, content_digest) VALUES ($1, 'held', $2)
-			ON CONFLICT (id) DO NOTHING`, in.GetBranchId(), digest)
+		a, err := reserve.Hold(ctx, tx, kind(m), in.GetBranchId(), digest, func(ctx context.Context, tx db.Tx) (bool, string, error) {
+			if perr != nil {
+				return false, "", perr
+			}
+			var shortages []core.Shortage
+			short := func(l core.BranchLine, avail, reason string) {
+				shortages = append(shortages, core.Shortage{ProductID: l.ProductID, WarehouseID: l.WarehouseID,
+					Requested: l.Quantity, Available: avail, Reason: reason})
+			}
+			for _, l := range lines {
+				if p, ok := products[l.ProductID]; !ok || p.Kind != "stock" {
+					short(l, "0", "product_not_stocked")
+				}
+			}
+			for _, l := range lines {
+				if _, err := warehouses.UsableWarehouses(ctx, tx, in.GetLegalEntityId(), []string{l.WarehouseID}); err != nil {
+					reason := "warehouse_not_found"
+					if e := errs.From(err); e != nil && e.Reason == "WAREHOUSE_NOT_USABLE" {
+						w, gerr := core.GetWarehouse(ctx, tx, l.WarehouseID, false)
+						switch {
+						case errors.Is(gerr, core.ErrNone):
+						case gerr != nil:
+							return false, "", gerr
+						case w.LegalEntityID != in.GetLegalEntityId():
+							reason = "warehouse_not_in_legal_entity"
+						default:
+							reason = "warehouse_inactive"
+						}
+					}
+					short(l, "0", reason)
+				}
+			}
+			state, reason := "held", ""
+			if len(shortages) > 0 {
+				state, reason = "rejected", "invalid_line"
+			} else {
+				keys := make([]stock.Key, len(lines))
+				for i, l := range lines {
+					keys[i] = stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}
+				}
+				pos, err := stock.LockPositions(ctx, tx, in.GetLegalEntityId(), keys)
+				if err != nil {
+					return false, "", err
+				}
+				for i, l := range lines {
+					ok, err := stock.AtLeast(ctx, tx, pos[keys[i]].Available, l.Quantity)
+					if err != nil {
+						return false, "", err
+					}
+					if !ok {
+						short(l, pos[keys[i]].Available, "insufficient")
+					}
+				}
+				if len(shortages) > 0 {
+					state, reason = "rejected", "insufficient_stock"
+				} else {
+					for i, l := range lines {
+						if err := stock.MoveStock(m, ctx, tx, keys[i], "0", l.Quantity); err != nil {
+							return false, "", err
+						}
+					}
+				}
+			}
+			if shortages == nil {
+				shortages = []core.Shortage{}
+			}
+			sj, _ := json.Marshal(shortages)
+			ref := in.GetReference()
+			if _, err := tx.Exec(ctx, `INSERT INTO branch (id, legal_entity_id, ref_kind, ref_id, ref_revision, shortages)
+			VALUES ($1, $2, $3, $4, $5, $6)`, in.GetBranchId(), in.GetLegalEntityId(), ref.GetKind(), ref.GetId(),
+				ref.GetRevision(), sj); err != nil {
+				return false, "", err
+			}
+			for _, l := range lines {
+				if _, err := tx.Exec(ctx, `INSERT INTO branch_line (branch_id, product_id, warehouse_id, quantity)
+				VALUES ($1, $2, $3, $4::numeric)`, in.GetBranchId(), l.ProductID, l.WarehouseID, l.Quantity); err != nil {
+					return false, "", err
+				}
+			}
+			return state == "held", reason, nil
+		})
 		if err != nil {
 			return err
 		}
-		if tag.RowsAffected() == 0 { // seen before: a tombstone, the same hold again, or a conflict
-			b, err := core.GetBranch(ctx, tx, in.GetBranchId(), true)
-			if err != nil {
-				return err
-			}
-			if b.State != "cancelled" && (b.Digest == nil || *b.Digest != digest) {
-				return core.ErrContent.New("branch " + b.ID + " was held with other content")
-			}
-			out = b
-			return nil
+		if a.Conflict {
+			return core.ErrContent.New("branch " + in.GetBranchId() + " was held with other content")
 		}
-		if perr != nil {
-			return perr
-		}
-		var shortages []core.Shortage
-		short := func(l core.BranchLine, avail, reason string) {
-			shortages = append(shortages, core.Shortage{ProductID: l.ProductID, WarehouseID: l.WarehouseID,
-				Requested: l.Quantity, Available: avail, Reason: reason})
-		}
-		for _, l := range lines {
-			if p, ok := products[l.ProductID]; !ok || p.Kind != "stock" {
-				short(l, "0", "product_not_stocked")
-			}
-		}
-		for _, l := range lines {
-			if _, err := warehouses.UsableWarehouses(ctx, tx, in.GetLegalEntityId(), []string{l.WarehouseID}); err != nil {
-				reason := "warehouse_not_found"
-				if e := errs.From(err); e != nil && e.Reason == "WAREHOUSE_NOT_USABLE" {
-					w, gerr := core.GetWarehouse(ctx, tx, l.WarehouseID, false)
-					switch {
-					case errors.Is(gerr, core.ErrNone):
-					case gerr != nil:
-						return gerr
-					case w.LegalEntityID != in.GetLegalEntityId():
-						reason = "warehouse_not_in_legal_entity"
-					default:
-						reason = "warehouse_inactive"
-					}
-				}
-				short(l, "0", reason)
-			}
-		}
-		state, reason := "held", ""
-		if len(shortages) > 0 {
-			state, reason = "rejected", "invalid_line"
-		} else {
-			keys := make([]stock.Key, len(lines))
-			for i, l := range lines {
-				keys[i] = stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}
-			}
-			pos, err := stock.LockPositions(ctx, tx, in.GetLegalEntityId(), keys)
-			if err != nil {
-				return err
-			}
-			for i, l := range lines {
-				ok, err := stock.AtLeast(ctx, tx, pos[keys[i]].Available, l.Quantity)
-				if err != nil {
-					return err
-				}
-				if !ok {
-					short(l, pos[keys[i]].Available, "insufficient")
-				}
-			}
-			if len(shortages) > 0 {
-				state, reason = "rejected", "insufficient_stock"
-			} else {
-				for i, l := range lines {
-					if err := stock.MoveStock(m, ctx, tx, keys[i], "0", l.Quantity); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		if shortages == nil {
-			shortages = []core.Shortage{}
-		}
-		sj, _ := json.Marshal(shortages)
-		var reasonCol *string
-		if reason != "" {
-			reasonCol = &reason
-		}
-		ref := in.GetReference()
-		if _, err := tx.Exec(ctx, `UPDATE branch SET legal_entity_id = $2, ref_kind = $3, ref_id = $4, ref_revision = $5,
-			state = $6, reason = $7, shortages = $8, hold_expires_at = CASE WHEN $6 = 'held' THEN now() + $9::interval END
-			WHERE id = $1`, in.GetBranchId(), in.GetLegalEntityId(), ref.GetKind(), ref.GetId(), ref.GetRevision(), state,
-			reasonCol, sj, fmt.Sprintf("%d seconds", int(core.HoldTTL.Seconds()))); err != nil {
-			return err
-		}
-		for _, l := range lines {
-			if _, err := tx.Exec(ctx, `INSERT INTO branch_line (branch_id, product_id, warehouse_id, quantity)
-				VALUES ($1, $2, $3, $4::numeric)`, in.GetBranchId(), l.ProductID, l.WarehouseID, l.Quantity); err != nil {
-				return err
-			}
-		}
-		if out, err = core.GetBranch(ctx, tx, in.GetBranchId(), false); err != nil {
-			return err
-		}
-		return core.Emit(m, ctx, tx, core.BranchChanged, out.ID, out.Version, out)
+		out, err = answered(ctx, tx, a)
+		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &inventoryv3.HoldResponse{Branch: wire(out)}, nil
+	return &inventoryv3.HoldResponse{Branch: out}, nil
 }
 
-// release gives back what a held or committed branch has not consumed and moves it to state (released or expired).
-func release(m *core.Base, ctx context.Context, tx db.Tx, b core.Branch, state string) (core.Branch, error) {
-	var keys []stock.Key
-	for _, l := range b.Lines {
-		keys = append(keys, stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID})
-	}
-	if _, err := stock.LockPositions(ctx, tx, *b.LegalEntityID, keys); err != nil {
-		return b, err
-	}
-	for _, l := range b.Lines {
-		var rest string
-		if err := tx.QueryRow(ctx, `SELECT trim_scale($1::numeric - $2::numeric)::text`, l.Quantity, l.Consumed).
-			Scan(&rest); err != nil {
-			return b, err
-		}
-		if rest != "0" {
-			if err := stock.MoveStock(m, ctx, tx, stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}, "0", stock.Neg(rest)); err != nil {
-				return b, err
+// Kind names this participation's branches in the SDK's table.
+const Kind = "erp.inventory.order"
+
+// kind is erp/inventory's participation in protocol 04 (be-protocol chapter 16): the branch's state is the SDK's
+// (reserve), what it takes is stock reserved on its lines' positions.
+func kind(m *core.Base) reserve.Kind {
+	return reserve.Kind{Name: Kind, Period: core.HoldTTL,
+		Lock: func(ctx context.Context, tx db.Tx, id string) error { // the lines' positions, in order, before the branch
+			b, err := core.GetBranch(ctx, tx, id)
+			if err != nil || b.LegalEntityID == nil || len(b.Lines) == 0 {
+				return err // a tombstone locks nothing
 			}
-		}
-	}
-	return SetState(m, ctx, tx, b.ID, state)
+			_, err = stock.LockPositions(ctx, tx, *b.LegalEntityID, keysOf(b))
+			return err
+		},
+		GiveBack: func(ctx context.Context, tx db.Tx, rb reserve.Branch) error {
+			b, err := core.GetBranch(ctx, tx, rb.ID)
+			if err != nil {
+				return err
+			}
+			for _, l := range b.Lines {
+				var rest string
+				if err := tx.QueryRow(ctx, `SELECT trim_scale($1::numeric - $2::numeric)::text`, l.Quantity, l.Consumed).
+					Scan(&rest); err != nil {
+					return err
+				}
+				if rest != "0" {
+					if err := stock.MoveStock(m, ctx, tx, stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}, "0",
+						stock.Neg(rest)); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+		Changed: func(ctx context.Context, tx db.Tx, rb reserve.Branch) error {
+			b, err := core.GetBranch(ctx, tx, rb.ID)
+			if err != nil {
+				return err
+			}
+			return core.Emit(m, ctx, tx, core.BranchChanged, b.ID, b.Version, b)
+		}}
 }
 
-func SetState(m *core.Base, ctx context.Context, tx db.Tx, id, state string) (core.Branch, error) {
-	if _, err := tx.Exec(ctx, `UPDATE branch SET state = $2, hold_expires_at = CASE WHEN $2 = 'held' THEN hold_expires_at END,
-		confirmed_at = CASE WHEN $2 = 'committed' THEN now() ELSE confirmed_at END, version = version + 1,
-		updated_at = now() WHERE id = $1`, id, state); err != nil {
-		return core.Branch{}, err
+// Participant is this participation for the issue, which consumes branches in its own transaction.
+func Participant(m *core.Base) reserve.Kind { return kind(m) }
+
+func keysOf(b core.Branch) []stock.Key {
+	keys := make([]stock.Key, len(b.Lines))
+	for i, l := range b.Lines {
+		keys[i] = stock.Key{Product: l.ProductID, Warehouse: l.WarehouseID}
 	}
-	b, err := core.GetBranch(ctx, tx, id, false)
+	return keys
+}
+
+// answered is the branch after a command, read in the command's transaction; Absent answers ABSENT.
+func answered(ctx context.Context, tx db.Tx, a reserve.Answer) (*inventoryv3.Branch, error) {
+	if a.Branch.State == reserve.Absent {
+		return absent(a.Branch.ID), nil
+	}
+	b, err := core.GetBranch(ctx, tx, a.Branch.ID)
 	if err != nil {
-		return b, err
+		return nil, err
 	}
-	return b, core.Emit(m, ctx, tx, core.BranchChanged, b.ID, b.Version, b)
+	return wire(b), nil
 }
 
-// expired reports whether a held branch is past its hold period, by the database clock.
-func expired(ctx context.Context, tx db.Tx, id string) (bool, error) {
-	var past bool
-	err := tx.QueryRow(ctx, `SELECT hold_expires_at <= now() FROM branch WHERE id = $1`, id).Scan(&past)
-	return past, err
+// onBranch runs a command on a branch in a transaction and answers it (ABSENT for none stored).
+func onBranch(m *core.Base, ctx context.Context, id string, command func(ctx context.Context, tx db.Tx) (reserve.Answer, error)) (*inventoryv3.Branch, error) {
+	if err := BranchID(id); err != nil {
+		return nil, err
+	}
+	var out *inventoryv3.Branch
+	err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
+		a, err := command(ctx, tx)
+		if err != nil {
+			return err
+		}
+		out, err = answered(ctx, tx, a)
+		return err
+	})
+	return out, err
 }
 
 // Confirm turns a held branch into a committed one; a held branch past its period expires here instead (the same
-// row lock as the expiry job, so the two never both win), and an expired one is never revived.
+// lock as the expiry job, so the two never both win), and an expired one is never revived.
 func Confirm(m *core.Base, ctx context.Context, in *inventoryv3.ConfirmRequest) (*inventoryv3.ConfirmResponse, error) {
-	b, err := onBranch(m, ctx, in.GetBranchId(), func(ctx context.Context, tx db.Tx, b core.Branch) (core.Branch, error) {
-		if b.State != "held" {
-			return b, nil
-		}
-		past, err := expired(ctx, tx, b.ID)
-		if err != nil {
-			return b, err
-		}
-		if past {
-			return release(m, ctx, tx, b, "expired")
-		}
-		return SetState(m, ctx, tx, b.ID, "committed")
+	b, err := onBranch(m, ctx, in.GetBranchId(), func(ctx context.Context, tx db.Tx) (reserve.Answer, error) {
+		return reserve.Confirm(ctx, tx, kind(m), in.GetBranchId())
 	})
 	if err != nil {
 		return nil, err
@@ -288,41 +305,20 @@ func Confirm(m *core.Base, ctx context.Context, in *inventoryv3.ConfirmRequest) 
 
 // Cancel releases what the branch has not consumed; an unknown branch becomes a tombstone that refuses a late hold.
 func Cancel(m *core.Base, ctx context.Context, in *inventoryv3.CancelRequest) (*inventoryv3.CancelResponse, error) {
-	if err := BranchID(in.GetBranchId()); err != nil {
-		return nil, err
-	}
-	var out core.Branch
-	err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
-		tag, err := tx.Exec(ctx, `INSERT INTO branch (id, state) VALUES ($1, 'cancelled') ON CONFLICT (id) DO NOTHING`,
-			in.GetBranchId())
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 1 {
-			if out, err = core.GetBranch(ctx, tx, in.GetBranchId(), false); err != nil {
-				return err
-			}
-			return core.Emit(m, ctx, tx, core.BranchChanged, out.ID, out.Version, out)
-		}
-		b, err := core.GetBranch(ctx, tx, in.GetBranchId(), true)
-		if err != nil {
-			return err
-		}
-		out = b
-		if b.State == "held" || b.State == "committed" {
-			out, err = release(m, ctx, tx, b, "released")
-		}
-		return err
+	b, err := onBranch(m, ctx, in.GetBranchId(), func(ctx context.Context, tx db.Tx) (reserve.Answer, error) {
+		return reserve.Cancel(ctx, tx, kind(m), in.GetBranchId())
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &inventoryv3.CancelResponse{Branch: wire(out)}, nil
+	return &inventoryv3.CancelResponse{Branch: b}, nil
 }
 
 // Query answers the branch as it is; it leaves no tombstone.
 func Query(m *core.Base, ctx context.Context, in *inventoryv3.QueryRequest) (*inventoryv3.QueryResponse, error) {
-	b, err := onBranch(m, ctx, in.GetBranchId(), func(_ context.Context, _ db.Tx, b core.Branch) (core.Branch, error) { return b, nil })
+	b, err := onBranch(m, ctx, in.GetBranchId(), func(ctx context.Context, tx db.Tx) (reserve.Answer, error) {
+		return reserve.Query(ctx, tx, kind(m), in.GetBranchId())
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -334,77 +330,10 @@ func Adjust(m *core.Base, _ context.Context, _ *inventoryv3.AdjustRequest) (*inv
 	return nil, errs.New(errs.ReasonCapabilityUnsupported, "branch adjustment (order revisions) is not in this version of erp/inventory")
 }
 
-// onBranch locks an existing branch and applies fn; an unknown branch answers ABSENT.
-func onBranch(m *core.Base, ctx context.Context, id string, fn func(ctx context.Context, tx db.Tx, b core.Branch) (core.Branch, error)) (*inventoryv3.Branch, error) {
-	if err := BranchID(id); err != nil {
-		return nil, err
-	}
-	var out core.Branch
-	err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
-		b, err := core.GetBranch(ctx, tx, id, true)
-		if err != nil {
-			return err
-		}
-		out, err = fn(ctx, tx, b)
-		return err
-	})
-	if errors.Is(err, core.ErrNone) {
-		return absent(id), nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return wire(out), nil
-}
-
-// ExpireHolds releases held branches past their period, each in its own transaction; the row lock decides against a
-// concurrent confirm (whichever locks first wins, the other sees the result).
+// ExpireHolds releases held branches past their period (the SDK's expiry: each in its own transaction, the
+// positions then the branch).
 func ExpireHolds(m *core.Base, ctx context.Context, _ *work.Run) error {
-	for {
-		var due []string
-		err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
-			due = due[:0]
-			rows, err := tx.Query(ctx, `SELECT id::text FROM branch WHERE state = 'held' AND hold_expires_at <= now()
-				ORDER BY hold_expires_at LIMIT 100`)
-			if err != nil {
-				return err
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var id string
-				if err := rows.Scan(&id); err != nil {
-					return err
-				}
-				due = append(due, id)
-			}
-			return rows.Err()
-		})
-		if err != nil {
-			return err
-		}
-		// each in its own transaction, branch row then positions (RS16): one transaction for the batch would hold the
-		// positions of every branch released so far, out of the global order a concurrent hold or issue keeps
-		for _, id := range due {
-			if err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
-				b, err := core.GetBranch(ctx, tx, id, true)
-				if err != nil || b.State != "held" {
-					return err
-				}
-				var past bool
-				if err := tx.QueryRow(ctx, `SELECT hold_expires_at <= now() FROM branch WHERE id = $1::uuid`, id).
-					Scan(&past); err != nil || !past {
-					return err
-				}
-				_, err = release(m, ctx, tx, b, "expired")
-				return err
-			}); err != nil {
-				return err
-			}
-		}
-		if len(due) < 100 {
-			return nil
-		}
-	}
+	return reserve.ExpireDue(ctx, m.RT.DB, kind(m))
 }
 
 // GetBranchHTTP shows a branch to a user who may read stock in every warehouse of it; a tombstone is not shown.
@@ -416,7 +345,7 @@ func GetBranchHTTP(m *core.Base, c *httpx.Context) error {
 	var b core.Branch
 	err := m.RT.DB.Tx(c.Ctx(), func(ctx context.Context, tx db.Tx) error {
 		var err error
-		b, err = core.GetBranch(ctx, tx, id, false)
+		b, err = core.GetBranch(ctx, tx, id)
 		return err
 	})
 	if errors.Is(err, core.ErrNone) || err == nil && b.LegalEntityID == nil {

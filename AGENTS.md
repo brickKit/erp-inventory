@@ -24,7 +24,7 @@
 | [`stock`](internal/stock/AGENTS.md) | 余额：加锁顺序与变动（在库、已预占）、批次与序列号、余额与批次与序列号的列表、系统面的 `Positions` | `stock_position`、`stock_lot`、`stock_serial` |
 | [`movements`](internal/movements/AGENTS.md) | 入库、追踪政策的检查、流水的读取与列表 | `movement` |
 | [`numbering`](internal/numbering/AGENTS.md) | 两个序号的提交后编号与流水事件 | `seq_counter` |
-| [`branches`](internal/branches/AGENTS.md) | 预占分支（协议 04，本组件是参与方）：预占、确认、取消、查询、暂存到期 | `branch`、`branch_line` |
+| [`branches`](internal/branches/AGENTS.md) | 预占分支（协议 04，本组件是参与方；状态机在 SDK 的 `reserve`）：预占、确认、取消、查询、暂存到期 | `branch`、`branch_line`（分支的状态在 SDK 的 `be_reserve_branch`） |
 | [`issue`](internal/issue/AGENTS.md) | 出库并消耗分支、批次的先进先出分配 | `consumption` |
 
 共用的：[`masterdata`](internal/masterdata/AGENTS.md)（事务外向 `mdm/org`、`mdm/product` 取证）、[`core`](internal/core/AGENTS.md)（名字与资源定义、校验、审计与事件的写法、记录的类型与读取、列表的共用部分）。
@@ -40,13 +40,14 @@
 
 ## 构建与测试
 
-- `go test ./...`（`make test`）：清单的 `configSchema` 与 `events`、OpenAPI 与路由、事件载荷、合并安全。
+- `go test ./...`（`make test`）：清单的 `configSchema` 与 `events`、OpenAPI 与路由、事件载荷、合并安全、结构检查（`inventory/structure_test.go`）。
 - `make test-integration`（`go test -tags integration ./itest/`）：真实的 PostgreSQL 与消息系统；每个文件测哪条流程、要什么前提，在 [itest/AGENTS.md](itest/AGENTS.md)。
 - `brickkit lint`
 
 ## 设计取舍
 
-- **余额行是唯一的裁决点**：在库与已预占在同一行，库里还有 `on_hand >= reserved` 的约束兜底；多行按（产品，仓库）升序加锁，不死锁（RS16）。
+- **余额行是唯一的裁决点**：在库与已预占在同一行，库里还有 `on_hand >= reserved` 的约束兜底；多行按（产品，仓库）升序加锁，不死锁（RS16）；余额行先于分支行锁（SDK 的 `reserve`，线协议 P16.11）。
+- **分支的状态机在 SDK**：协议 04 参与方的规则只实现一次（be-sdk-go 的 `reserve`），本组件只写占用、退回与出库。
 - **出库同时减在库与已预占**：带分支的出库发出的是占住的货，可用量不变。
 - **序号在提交之后编**：出入库的事务不碰全局计数，热点只在编号事务里；流水事件在计价编号的事务里写，所以总带着两个序号。提交后立刻编一次，失败由每秒一次的单例工作项补上。
 - **预占的幂等靠分支身份，出库的幂等靠消耗身份**：系统面的这两个命令不用请求幂等键，身份就是业务的。

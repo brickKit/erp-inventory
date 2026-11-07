@@ -100,7 +100,7 @@ func (fx *fixture) lateAndExpired() {
 	// an expired hold is not revived by a late confirm
 	stale := ids.New().String()
 	fx.hold(stale, line(fx.tea, fx.whSH, "1"))
-	_, err = fx.admin.Exec(ctx, "UPDATE "+itSchema+".branch SET hold_expires_at = now() - interval '1 second' WHERE id = $1", stale)
+	_, err = fx.admin.Exec(ctx, "UPDATE "+itSchema+".be_reserve_branch SET hold_expires_at = now() - interval '1 second' WHERE id = $1", stale)
 	require.NoError(t, err)
 	cf, err := fx.res.Confirm(ctx, &inventoryv3.ConfirmRequest{BranchId: stale})
 	require.NoError(t, err)

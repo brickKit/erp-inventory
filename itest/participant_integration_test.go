@@ -121,7 +121,7 @@ func (fx *fixture) participant() {
 	// expired by the participant's own job: a hold past its period; then confirm and cancel change nothing
 	stale := ids.New().String()
 	fx.hold(stale, line(fx.rice, fx.whSH, "1"))
-	_, err = fx.admin.Exec(ctx, "UPDATE "+itSchema+".branch SET hold_expires_at = now() - interval '1 second' WHERE id = $1", stale)
+	_, err = fx.admin.Exec(ctx, "UPDATE "+itSchema+".be_reserve_branch SET hold_expires_at = now() - interval '1 second' WHERE id = $1", stale)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
 		q, err := fx.res.Query(ctx, &inventoryv3.QueryRequest{BranchId: stale})

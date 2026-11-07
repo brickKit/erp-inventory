@@ -4,14 +4,14 @@
 
 ## 负责与不负责
 
-- 负责：表 `consumption`；`StockService.Issue`；`allocateBatches`。
+- 负责：表 `consumption`（一次出库的流水）；`StockService.Issue`（经 SDK 的 `reserve.Consume`：消耗身份的幂等、分支是否已确认、锁的顺序由它管；`issueFrom` 做出库本身）；`allocateBatches`。
 - 不负责：预占（`branches`）；序号（`numbering`）。
 
 ## 文件
 
 | 文件 | 内容 |
 | --- | --- |
-| `issue.go` | `refused`、`Error`、`allocation`、`Issue`、`allocateBatches` |
+| `issue.go` | `refused`、`Error`、`allocation`、`Issue`、`issueFrom`、`allocateBatches` |
 
 ## 依赖与被依赖
 
