@@ -23,6 +23,7 @@
 | `movements_integration_test.go` | `numbering` | 流水事件带两个序号；库存序号没有缺号；计价序号按产品与法人计 | `numbering` |
 | `dimensions_integration_test.go` | `dimensions` | Bob 只有北京仓：余额、分支、仓库只看得到能看的 | `stock`、`branches`、`warehouses` |
 | `recoverycheck_integration_test.go` | `recoveryChecks` | 整套恢复的核对：仓库与流水按版本答“还在不在” | 入口 `inventory/checks.go` |
+| `participant_integration_test.go` | `participant` | 协议 04 的分支迁移里业务流程走不到的格（用自己收的货）：已结束的分支再确认、再取消不变；只从已确认的分支出库（拒绝是出库的问题，不是错误）、不超出剩余、出完成为已消耗；消耗身份换内容是冲突；查询不留墓碑；到期作业让过期的暂存到期；调整答“不支持” | `branches`、`issue` |
 
 共用的：
 

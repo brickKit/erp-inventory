@@ -100,6 +100,8 @@
 
 ## 实现状态
 
+3.0.31：新的集成测试步骤 `participant` 锁住协议 04 的分支迁移里业务流程走不到的格（预占参与方进 SDK 之前的 R0，装配项目的结构问题 SF03），行为不变。
+
 3.0.30：合并安全的单元测试扩到 `internal/` 下全部包（分层以来只查入口包，装配项目的结构问题 SF24）；依赖换到分层之后的版本：`mdm/org@3.0.31`、`mdm/product@3.0.33`。
 
 3.0.29：代码按业务模块分层，行为不变：入口包 `inventory/` 只组装，业务在 `internal/` 下（`warehouses`、`stock`、`movements`、`numbering`、`branches`、`issue`、`masterdata`、`core`），集成测试在 `itest/`、按业务流程分文件；每个代码目录一份 `AGENTS.md`。

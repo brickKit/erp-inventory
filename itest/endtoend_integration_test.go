@@ -151,6 +151,7 @@ func TestInventoryEndToEnd(t *testing.T) {
 	fx.numbering()
 	fx.dimensions()
 	fx.recoveryChecks()
+	fx.participant()
 }
 
 // hold holds the lines on a branch in le.
