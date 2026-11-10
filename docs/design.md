@@ -103,6 +103,8 @@
 
 ## 实现状态
 
+3.0.38：依赖换到 mdm/product 3.0.38（种子让四个服务可采购；装配项目阶段计划 C2 的 P5），行为不变
+
 3.0.37（装配项目阶段计划 C2 的 P0b，采购要它）：采购收货与采购退货的系统面（`StockService.Receive`、`Return`，操作 `erp.inventory.system.receive`，契约 alpha.2）；流水种类 `purchase_return` 与原入库流水（`origin_movement_id`，事件里也带）。
 
 3.0.36：be-sdk-go alpha.121（全系统同一个 SDK 版本；sectest 的授权组件替身答 CheckLinkChange 与 Administrators）
