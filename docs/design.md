@@ -100,6 +100,8 @@
 
 ## 实现状态
 
+3.0.36：be-sdk-go alpha.121（全系统同一个 SDK 版本；sectest 的授权组件替身答 CheckLinkChange 与 Administrators）
+
 3.0.35：依赖换到 mdm/org 3.0.34（岗位；装配项目阶段计划 C1 的 E0b），行为不变
 
 3.0.34：be-sdk-go alpha.119（全系统同一个 SDK 版本；订阅最后一次投递处理之前先提交死信，进程中途退出时消息不再无声消失，P6.20）
