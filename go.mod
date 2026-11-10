@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/brickKit/be-sdk-go/v3 v3.0.0-alpha.121
-	github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.1
+	github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.2
 	github.com/brickKit/mdm-org/contract/v3 v3.0.0-alpha.1
 	github.com/brickKit/mdm-product/contract/v3 v3.0.0-alpha.1
 	github.com/jackc/pgx/v5 v5.11.0

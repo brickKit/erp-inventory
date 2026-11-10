@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `warehouses` | 仓库 | `core`、`masterdata` |
 | `stock` | 余额的加锁与变动、批次、序列号、余额的读取 | `core` |
-| `movements` | 入库、流水的读取 | `core`、`masterdata`、`numbering`、`stock`、`warehouses` |
+| `movements` | 入库、采购收货与退货、流水的读取 | `core`、`masterdata`、`numbering`、`stock`、`warehouses` |
 | `numbering` | 两个序号的提交后编号与流水事件 | `core` |
 | `branches` | 预占分支（状态机在 SDK 的 `reserve`） | `core`、`masterdata`、`stock`、`warehouses` |
 | `issue` | 出库并消耗分支、批次分配 | `branches`、`core`、`masterdata`、`movements`、`numbering`、`stock` |

@@ -62,6 +62,8 @@ func (m *Module) Services(s *grpcx.Services) error {
 		"Adjust":  {Operation: core.OpSysReserve, Callers: []string{core.Sales}}})
 	s.Register(&inventoryv3.StockService_ServiceDesc, m, map[string]grpcx.Method{
 		"Issue":     {Operation: core.OpSysIssue, Callers: []string{core.Sales}},
+		"Receive":   {Operation: core.OpSysReceive, Callers: []string{core.Purchase}},
+		"Return":    {Operation: core.OpSysReceive, Callers: []string{core.Purchase}},
 		"Positions": {Operation: core.OpSysRead, Callers: []string{grpcx.AnyComponent}}})
 	return nil
 }

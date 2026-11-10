@@ -64,9 +64,11 @@ type Movement struct {
 	Reference     *Reference `json:"reference"`
 	BranchID      *string    `json:"branch_id"`
 	ConsumptionID *string    `json:"consumption_id"`
-	InventorySeq  *Seq       `json:"inventory_seq"`
-	ValuationSeq  *Seq       `json:"valuation_seq"`
-	RecordedAt    string     `json:"recorded_at"`
+	// OriginMovementID is a purchase return's receipt movement (3.0.37); omitted otherwise
+	OriginMovementID *string `json:"origin_movement_id,omitempty"`
+	InventorySeq     *Seq    `json:"inventory_seq"`
+	ValuationSeq     *Seq    `json:"valuation_seq"`
+	RecordedAt       string  `json:"recorded_at"`
 }
 
 // BranchLine is one product and warehouse of a branch.
@@ -109,7 +111,7 @@ const (
 	MovementCols = `m.id::text, m.kind, m.product_id::text, m.warehouse_id::text, m.legal_entity_id::text,
 		trim_scale(m.quantity)::text, m.batch, m.serials, m.business_date::text, m.ref_kind, m.ref_id, m.ref_line_id,
 		m.branch_id::text, m.consumption_id, m.inventory_epoch, m.inventory_seq, m.valuation_epoch, m.valuation_seq,
-		m.recorded_at`
+		m.recorded_at, m.origin_movement_id::text`
 	// a branch is the SDK's participant record (be_reserve_branch: state, reason, digest, hold period, version, times)
 	// with what it takes here (branch and its lines; none on a tombstone)
 	branchCols = `r.id::text, b.legal_entity_id::text, b.ref_kind, b.ref_id, b.ref_revision, r.state, r.reason,
@@ -143,7 +145,7 @@ func ScanMovement(row pgx.Row) (Movement, error) {
 	var at time.Time
 	err := row.Scan(&m.FactID, &m.Kind, &m.ProductID, &m.WarehouseID, &m.LegalEntityID, &m.Quantity, &m.Batch,
 		&m.Serials, &m.BusinessDate, &refKind, &refID, &refLine, &m.BranchID, &m.ConsumptionID, &invEpoch, &invSeq,
-		&valEpoch, &valSeq, &at)
+		&valEpoch, &valSeq, &at, &m.OriginMovementID)
 	if err != nil {
 		return m, err
 	}

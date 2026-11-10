@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -132,11 +133,12 @@ type fixture struct {
 	alice                 client
 	res                   inventoryv3.ReservationServiceClient
 	stockc                inventoryv3.StockServiceClient
-	le, otherLE           string         // the legal entities
-	tea, phone, rice, svc string         // the products: by batch, by serial, plain, a service
-	whSH, whBJ, whHK      string         // the warehouses: Shanghai and Beijing in le, Hong Kong in otherLE (warehouses)
-	sh                    map[string]any // the Shanghai warehouse (warehouses)
-	order                 string         // a branch held twice and confirmed, then issued (holdIdempotence)
+	purchase              inventoryv3.StockServiceClient // as erp/purchase (purchases)
+	le, otherLE           string                         // the legal entities
+	tea, phone, rice, svc string                         // the products: by batch, by serial, plain, a service
+	whSH, whBJ, whHK      string                         // the warehouses: Shanghai and Beijing in le, Hong Kong in otherLE (warehouses)
+	sh                    map[string]any                 // the Shanghai warehouse (warehouses)
+	order                 string                         // a branch held twice and confirmed, then issued (holdIdempotence)
 }
 
 func TestInventoryEndToEnd(t *testing.T) {
@@ -149,6 +151,7 @@ func TestInventoryEndToEnd(t *testing.T) {
 	fx.issue()
 	fx.serialIssue()
 	fx.numbering()
+	fx.purchases()
 	fx.dimensions()
 	fx.recoveryChecks()
 	fx.participant()
@@ -244,7 +247,10 @@ func start(t *testing.T) *fixture {
 	conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, core.Sales).ClientConfig(core.ID))))
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
-	return &fixture{t: t, ctx: ctx, admin: admin, w: w, alice: client{t, w.Bearer(sectest.Alice)},
+	pconn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, "erp/purchase").ClientConfig(core.ID))))
+	require.NoError(t, err)
+	t.Cleanup(func() { pconn.Close() })
+	return &fixture{purchase: inventoryv3.NewStockServiceClient(pconn), t: t, ctx: ctx, admin: admin, w: w, alice: client{t, w.Bearer(sectest.Alice)},
 		res: inventoryv3.NewReservationServiceClient(conn), stockc: inventoryv3.NewStockServiceClient(conn),
 		le: le, otherLE: otherLE, tea: tea, phone: phone, rice: rice, svc: svc}
 }
@@ -271,4 +277,11 @@ func portFree(t *testing.T, addrs ...string) {
 		require.NoError(t, err, "port %s is taken: is a cell or another member running?", a)
 		_ = ln.Close()
 	}
+}
+
+// plus adds n to a decimal quantity as the positions answer it (whole numbers in these tests).
+func plus(q any, n int) string {
+	var v int
+	_, _ = fmt.Sscan(q.(string), &v)
+	return fmt.Sprint(v + n)
 }

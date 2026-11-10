@@ -6,6 +6,7 @@ import (
 	inventoryv3 "github.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3"
 	branches "github.com/brickKit/erp-inventory/v3/internal/branches"
 	issue "github.com/brickKit/erp-inventory/v3/internal/issue"
+	movements "github.com/brickKit/erp-inventory/v3/internal/movements"
 	stock "github.com/brickKit/erp-inventory/v3/internal/stock"
 )
 
@@ -44,4 +45,13 @@ func (m *Module) Issue(ctx context.Context, in *inventoryv3.IssueRequest) (*inve
 // Positions is StockService.Positions.
 func (m *Module) Positions(ctx context.Context, in *inventoryv3.PositionsRequest) (*inventoryv3.PositionsResponse, error) {
 	return stock.Positions(m.b, ctx, in)
+}
+
+// Receive and Return are the purchase component's receipts and returns (the movements module).
+func (m *Module) Receive(ctx context.Context, in *inventoryv3.ReceiveRequest) (*inventoryv3.ReceiveResponse, error) {
+	return movements.ReceivePurchase(m.b, ctx, in)
+}
+
+func (m *Module) Return(ctx context.Context, in *inventoryv3.ReturnRequest) (*inventoryv3.ReturnResponse, error) {
+	return movements.ReturnPurchase(m.b, ctx, in)
 }

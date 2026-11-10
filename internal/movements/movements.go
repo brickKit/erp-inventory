@@ -135,59 +135,9 @@ func Receive(m *core.Base, c *httpx.Context) error {
 		if _, err := warehouses.UsableWarehouses(ctx, tx, "", []string{wh.ID}); err != nil {
 			return idem.Outcome{}, err
 		}
-		keys := make([]stock.Key, len(in.Lines))
-		for i, l := range in.Lines {
-			keys[i] = stock.Key{Product: l.ProductID, Warehouse: wh.ID}
-		}
-		if _, err := stock.LockPositions(ctx, tx, wh.LegalEntityID, keys); err != nil {
+		movements, err := writeReceipt(m, ctx, tx, wh.LegalEntityID, wh.ID, in.BusinessDate, in.Lines, "receipt", req.Key, nil)
+		if err != nil {
 			return idem.Outcome{}, err
-		}
-		var movements []string
-		for i, l := range in.Lines {
-			if len(l.Serials) > 0 {
-				var taken []string
-				if err := tx.QueryRow(ctx, `SELECT coalesce(array_agg(serial ORDER BY serial), '{}') FROM stock_serial
-					WHERE product_id = $1 AND serial = ANY($2) AND in_stock`, l.ProductID, l.Serials).Scan(&taken); err != nil {
-					return idem.Outcome{}, err
-				}
-				if len(taken) > 0 {
-					return idem.Outcome{}, core.ErrTracking.New(fmt.Sprintf("lines[%d]: serial numbers already in stock: %v", i, taken))
-				}
-				for _, s := range l.Serials {
-					if _, err := tx.Exec(ctx, `INSERT INTO stock_serial (product_id, serial, warehouse_id, legal_entity_id, in_stock)
-						VALUES ($1, $2, $3, $4, true) ON CONFLICT (product_id, serial) DO UPDATE
-						SET warehouse_id = excluded.warehouse_id, legal_entity_id = excluded.legal_entity_id, in_stock = true,
-							updated_at = now()`, l.ProductID, s, wh.ID, wh.LegalEntityID); err != nil {
-						return idem.Outcome{}, err
-					}
-				}
-			}
-			var batch *string
-			if l.Batch != "" {
-				batch = &l.Batch
-				if _, err := tx.Exec(ctx, `INSERT INTO stock_lot (product_id, warehouse_id, legal_entity_id, batch, on_hand)
-					VALUES ($1, $2, $3, $4, $5::numeric) ON CONFLICT (product_id, warehouse_id, batch) DO UPDATE
-					SET on_hand = stock_lot.on_hand + excluded.on_hand`, l.ProductID, wh.ID, wh.LegalEntityID, l.Batch,
-					l.Quantity); err != nil {
-					return idem.Outcome{}, err
-				}
-			}
-			id := ids.New().String()
-			serials := l.Serials
-			if serials == nil {
-				serials = []string{}
-			}
-			slices.Sort(serials)
-			if _, err := tx.Exec(ctx, `INSERT INTO movement (id, kind, product_id, warehouse_id, legal_entity_id, quantity,
-				batch, serials, business_date, ref_kind, ref_id) VALUES ($1, 'receipt', $2, $3, $4, $5::numeric, $6, $7,
-				$8::date, 'receipt', $9)`, id, l.ProductID, wh.ID, wh.LegalEntityID, l.Quantity, batch, serials,
-				in.BusinessDate, req.Key); err != nil {
-				return idem.Outcome{}, err
-			}
-			if err := stock.MoveStock(m, ctx, tx, keys[i], l.Quantity, "0"); err != nil {
-				return idem.Outcome{}, err
-			}
-			movements = append(movements, id)
 		}
 		if err := core.Change(m, ctx, tx, actor, core.OpMoveCreate, core.Movements, movements[0], map[string]any{
 			"warehouse_id": wh.ID, "business_date": in.BusinessDate, "note": in.Note, "movements": movements}); err != nil {
@@ -275,4 +225,70 @@ func ListMovements(m *core.Base, c *httpx.Context) error {
 		return err
 	}
 	return c.JSON(200, map[string]any{"movements": out, "next_cursor": next})
+}
+
+// writeReceipt takes the lines into one warehouse in the caller's transaction (positions locked in key order, serial
+// numbers and batches, one movement a line with its reference): the manual receipt and the purchase receipt. lineIDs,
+// when given, are each line's reference line.
+func writeReceipt(m *core.Base, ctx context.Context, tx db.Tx, legalEntity, warehouse, date string, lines []receiptLine,
+	refKind, refID string, lineIDs []string) ([]string, error) {
+	keys := make([]stock.Key, len(lines))
+	for i, l := range lines {
+		keys[i] = stock.Key{Product: l.ProductID, Warehouse: warehouse}
+	}
+	if _, err := stock.LockPositions(ctx, tx, legalEntity, keys); err != nil {
+		return nil, err
+	}
+	var movements []string
+	for i, l := range lines {
+		if len(l.Serials) > 0 {
+			var taken []string
+			if err := tx.QueryRow(ctx, `SELECT coalesce(array_agg(serial ORDER BY serial), '{}') FROM stock_serial
+				WHERE product_id = $1 AND serial = ANY($2) AND in_stock`, l.ProductID, l.Serials).Scan(&taken); err != nil {
+				return nil, err
+			}
+			if len(taken) > 0 {
+				return nil, core.ErrTracking.New(fmt.Sprintf("lines[%d]: serial numbers already in stock: %v", i, taken))
+			}
+			for _, s := range l.Serials {
+				if _, err := tx.Exec(ctx, `INSERT INTO stock_serial (product_id, serial, warehouse_id, legal_entity_id, in_stock)
+					VALUES ($1, $2, $3, $4, true) ON CONFLICT (product_id, serial) DO UPDATE
+					SET warehouse_id = excluded.warehouse_id, legal_entity_id = excluded.legal_entity_id, in_stock = true,
+						updated_at = now()`, l.ProductID, s, warehouse, legalEntity); err != nil {
+					return nil, err
+				}
+			}
+		}
+		var batch *string
+		if l.Batch != "" {
+			batch = &l.Batch
+			if _, err := tx.Exec(ctx, `INSERT INTO stock_lot (product_id, warehouse_id, legal_entity_id, batch, on_hand)
+				VALUES ($1, $2, $3, $4, $5::numeric) ON CONFLICT (product_id, warehouse_id, batch) DO UPDATE
+				SET on_hand = stock_lot.on_hand + excluded.on_hand`, l.ProductID, warehouse, legalEntity, l.Batch,
+				l.Quantity); err != nil {
+				return nil, err
+			}
+		}
+		id := ids.New().String()
+		serials := l.Serials
+		if serials == nil {
+			serials = []string{}
+		}
+		slices.Sort(serials)
+		var line *string
+		if lineIDs != nil {
+			line = &lineIDs[i]
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO movement (id, kind, product_id, warehouse_id, legal_entity_id, quantity,
+			batch, serials, business_date, ref_kind, ref_id, ref_line_id) VALUES ($1, 'receipt', $2, $3, $4, $5::numeric,
+			$6, $7, $8::date, $9, $10, $11)`, id, l.ProductID, warehouse, legalEntity, l.Quantity, batch, serials,
+			date, refKind, refID, line); err != nil {
+			return nil, err
+		}
+		if err := stock.MoveStock(m, ctx, tx, keys[i], l.Quantity, "0"); err != nil {
+			return nil, err
+		}
+		movements = append(movements, id)
+	}
+	return movements, nil
 }

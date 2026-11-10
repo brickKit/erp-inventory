@@ -30,6 +30,10 @@ var (
 		"The batch or serial numbers do not fit the product's tracking policy")
 	ErrContent = errs.Define(ID, "CONTENT_CONFLICT", errs.AlreadyExists, 409, errs.RetryNo,
 		"The ID was used before with other content")
+	// ErrReturn: a purchase return that cannot be made from its receipt (not a receipt, more than it has left, a serial
+	// number it did not receive, not available now)
+	ErrReturn = errs.Define(ID, "RETURN_NOT_POSSIBLE", errs.FailedPrecondition, 409, errs.RetryNo,
+		"The return cannot be made from that receipt")
 )
 
 var UUIDForm = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

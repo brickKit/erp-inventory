@@ -22,7 +22,7 @@
 | --- | --- | --- |
 | [`warehouses`](internal/warehouses/AGENTS.md) | 仓库：建立、修改、读取、列表；能不能用 | `warehouse` |
 | [`stock`](internal/stock/AGENTS.md) | 余额：加锁顺序与变动（在库、已预占）、批次与序列号、余额与批次与序列号的列表、系统面的 `Positions` | `stock_position`、`stock_lot`、`stock_serial` |
-| [`movements`](internal/movements/AGENTS.md) | 入库、追踪政策的检查、流水的读取与列表 | `movement` |
+| [`movements`](internal/movements/AGENTS.md) | 入库、采购收货与退货（系统面）、追踪政策的检查、流水的读取与列表 | `movement`、`purchase_receipt`、`purchase_return` |
 | [`numbering`](internal/numbering/AGENTS.md) | 两个序号的提交后编号与流水事件 | `seq_counter` |
 | [`branches`](internal/branches/AGENTS.md) | 预占分支（协议 04，本组件是参与方；状态机在 SDK 的 `reserve`）：预占、确认、取消、查询、暂存到期 | `branch`、`branch_line`（分支的状态在 SDK 的 `be_reserve_branch`） |
 | [`issue`](internal/issue/AGENTS.md) | 出库并消耗分支、批次的先进先出分配 | `consumption` |

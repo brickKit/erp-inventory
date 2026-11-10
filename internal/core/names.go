@@ -15,6 +15,8 @@ const (
 	Org     = "mdm/org"
 	// Sales is the coordinator allowed to reserve and issue (protocol 04).
 	Sales = "erp/sales"
+	// Purchase is the component allowed to receive purchases and return them (3.0.37).
+	Purchase = "erp/purchase"
 )
 
 // The stream and its event types (contract/events).
@@ -46,6 +48,8 @@ const (
 	OpSysRead    = "erp.inventory.system.read"
 	OpSysReserve = "erp.inventory.system.reserve"
 	OpSysIssue   = "erp.inventory.system.issue"
+	// OpSysReceive is StockService.Receive and Return: the purchase component's receipts and returns (3.0.37)
+	OpSysReceive = "erp.inventory.system.receive"
 )
 
 // Dimensions of the user-surface resources (security 07): the legal entity and the warehouse.
@@ -106,5 +110,6 @@ func Definitions() *sdkauthz.Definitions {
 			{Key: OpRecover, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpSysReserve, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}},
 			{Key: OpSysIssue, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
+			{Key: OpSysReceive, ResourceType: System, Purpose: "action", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
 		}}
 }
