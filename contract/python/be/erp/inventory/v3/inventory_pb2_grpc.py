@@ -284,6 +284,16 @@ class StockServiceStub:
                 request_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsRequest.SerializeToString,
                 response_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsResponse.FromString,
                 _registered_method=True)
+        self.Receive = channel.unary_unary(
+                '/be.erp.inventory.v3.StockService/Receive',
+                request_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveRequest.SerializeToString,
+                response_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveResponse.FromString,
+                _registered_method=True)
+        self.Return = channel.unary_unary(
+                '/be.erp.inventory.v3.StockService/Return',
+                request_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnRequest.SerializeToString,
+                response_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnResponse.FromString,
+                _registered_method=True)
 
 
 class StockServiceServicer:
@@ -305,6 +315,24 @@ class StockServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Receive(self, request, context):
+        """Receive takes a purchase receipt into one warehouse (alpha.2; the purchase component only): idempotent by
+        receipt_id (the same content answers the same movements, other content is refused); each line's movement carries
+        the reference and the line's ID, and is the fact the receipt's quantity is taken from.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Return(self, request, context):
+        """Return issues a purchase return from an original receipt movement's warehouse and batch (alpha.2; the purchase
+        component only): idempotent by return_id; at most what the original received and has not returned, within what
+        is available.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_StockServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -317,6 +345,16 @@ def add_StockServiceServicer_to_server(servicer, server):
                     servicer.Positions,
                     request_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsRequest.FromString,
                     response_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsResponse.SerializeToString,
+            ),
+            'Receive': grpc.unary_unary_rpc_method_handler(
+                    servicer.Receive,
+                    request_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveRequest.FromString,
+                    response_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveResponse.SerializeToString,
+            ),
+            'Return': grpc.unary_unary_rpc_method_handler(
+                    servicer.Return,
+                    request_deserializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnRequest.FromString,
+                    response_serializer=be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -374,6 +412,60 @@ class StockService:
             '/be.erp.inventory.v3.StockService/Positions',
             be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsRequest.SerializeToString,
             be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.PositionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Receive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/be.erp.inventory.v3.StockService/Receive',
+            be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveRequest.SerializeToString,
+            be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReceiveResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Return(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/be.erp.inventory.v3.StockService/Return',
+            be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnRequest.SerializeToString,
+            be_dot_erp_dot_inventory_dot_v3_dot_inventory__pb2.ReturnResponse.FromString,
             options,
             channel_credentials,
             insecure,

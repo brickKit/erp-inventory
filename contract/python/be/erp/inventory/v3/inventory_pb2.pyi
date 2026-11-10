@@ -251,3 +251,67 @@ class PositionsResponse(_message.Message):
     POSITIONS_FIELD_NUMBER: _ClassVar[int]
     positions: _containers.RepeatedCompositeFieldContainer[Position]
     def __init__(self, positions: _Optional[_Iterable[_Union[Position, _Mapping]]] = ...) -> None: ...
+
+class ReceiveLine(_message.Message):
+    __slots__ = ("line_id", "product_id", "quantity", "batch", "serials")
+    LINE_ID_FIELD_NUMBER: _ClassVar[int]
+    PRODUCT_ID_FIELD_NUMBER: _ClassVar[int]
+    QUANTITY_FIELD_NUMBER: _ClassVar[int]
+    BATCH_FIELD_NUMBER: _ClassVar[int]
+    SERIALS_FIELD_NUMBER: _ClassVar[int]
+    line_id: str
+    product_id: str
+    quantity: str
+    batch: str
+    serials: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, line_id: _Optional[str] = ..., product_id: _Optional[str] = ..., quantity: _Optional[str] = ..., batch: _Optional[str] = ..., serials: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ReceiveRequest(_message.Message):
+    __slots__ = ("receipt_id", "legal_entity_id", "warehouse_id", "reference", "business_date", "lines")
+    RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
+    LEGAL_ENTITY_ID_FIELD_NUMBER: _ClassVar[int]
+    WAREHOUSE_ID_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    BUSINESS_DATE_FIELD_NUMBER: _ClassVar[int]
+    LINES_FIELD_NUMBER: _ClassVar[int]
+    receipt_id: str
+    legal_entity_id: str
+    warehouse_id: str
+    reference: Reference
+    business_date: str
+    lines: _containers.RepeatedCompositeFieldContainer[ReceiveLine]
+    def __init__(self, receipt_id: _Optional[str] = ..., legal_entity_id: _Optional[str] = ..., warehouse_id: _Optional[str] = ..., reference: _Optional[_Union[Reference, _Mapping]] = ..., business_date: _Optional[str] = ..., lines: _Optional[_Iterable[_Union[ReceiveLine, _Mapping]]] = ...) -> None: ...
+
+class ReceiveResponse(_message.Message):
+    __slots__ = ("receipt_id", "movement_ids")
+    RECEIPT_ID_FIELD_NUMBER: _ClassVar[int]
+    MOVEMENT_IDS_FIELD_NUMBER: _ClassVar[int]
+    receipt_id: str
+    movement_ids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, receipt_id: _Optional[str] = ..., movement_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ReturnRequest(_message.Message):
+    __slots__ = ("return_id", "origin_movement_id", "quantity", "serials", "reference", "line_id", "business_date")
+    RETURN_ID_FIELD_NUMBER: _ClassVar[int]
+    ORIGIN_MOVEMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    QUANTITY_FIELD_NUMBER: _ClassVar[int]
+    SERIALS_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    LINE_ID_FIELD_NUMBER: _ClassVar[int]
+    BUSINESS_DATE_FIELD_NUMBER: _ClassVar[int]
+    return_id: str
+    origin_movement_id: str
+    quantity: str
+    serials: _containers.RepeatedScalarFieldContainer[str]
+    reference: Reference
+    line_id: str
+    business_date: str
+    def __init__(self, return_id: _Optional[str] = ..., origin_movement_id: _Optional[str] = ..., quantity: _Optional[str] = ..., serials: _Optional[_Iterable[str]] = ..., reference: _Optional[_Union[Reference, _Mapping]] = ..., line_id: _Optional[str] = ..., business_date: _Optional[str] = ...) -> None: ...
+
+class ReturnResponse(_message.Message):
+    __slots__ = ("return_id", "movement_id")
+    RETURN_ID_FIELD_NUMBER: _ClassVar[int]
+    MOVEMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    return_id: str
+    movement_id: str
+    def __init__(self, return_id: _Optional[str] = ..., movement_id: _Optional[str] = ...) -> None: ...

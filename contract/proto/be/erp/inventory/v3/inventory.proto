@@ -32,6 +32,14 @@ service StockService {
   rpc Issue(IssueRequest) returns (IssueResponse);
   // Positions answers on hand, reserved and available by product and warehouse; at most 500 pairs a call.
   rpc Positions(PositionsRequest) returns (PositionsResponse);
+  // Receive takes a purchase receipt into one warehouse (alpha.2; the purchase component only): idempotent by
+  // receipt_id (the same content answers the same movements, other content is refused); each line's movement carries
+  // the reference and the line's ID, and is the fact the receipt's quantity is taken from.
+  rpc Receive(ReceiveRequest) returns (ReceiveResponse);
+  // Return issues a purchase return from an original receipt movement's warehouse and batch (alpha.2; the purchase
+  // component only): idempotent by return_id; at most what the original received and has not returned, within what
+  // is available.
+  rpc Return(ReturnRequest) returns (ReturnResponse);
 }
 
 enum BranchState {
@@ -206,4 +214,55 @@ message PositionsRequest {
 message PositionsResponse {
   // one per key, in order; a pair never moved answers zeros and version 0
   repeated Position positions = 1;
+}
+
+message ReceiveLine {
+  // the purchase receipt line (recorded as the movement's line reference)
+  string line_id = 1;
+  string product_id = 2;
+  // > 0, base unit
+  string quantity = 3;
+  // the batch of a batch-tracked product
+  string batch = 4;
+  // a serial-tracked product's serial numbers, exactly quantity of them
+  repeated string serials = 5;
+}
+
+message ReceiveRequest {
+  string receipt_id = 1;
+  string legal_entity_id = 2;
+  // it must belong to the legal entity and be usable
+  string warehouse_id = 3;
+  // e.g. kind "purchase_receipt", id the purchase order, revision the order's revision
+  Reference reference = 4;
+  // YYYY-MM-DD; empty: the legal entity's today
+  string business_date = 5;
+  repeated ReceiveLine lines = 6;
+}
+
+message ReceiveResponse {
+  string receipt_id = 1;
+  // one per line, in the lines' order
+  repeated string movement_ids = 2;
+}
+
+message ReturnRequest {
+  string return_id = 1;
+  // the receipt movement returned from: its product, warehouse, legal entity and batch
+  string origin_movement_id = 2;
+  // > 0, base unit
+  string quantity = 3;
+  // a serial-tracked product's serial numbers, from the original receipt and still in its warehouse
+  repeated string serials = 4;
+  // e.g. kind "purchase_return", id the return document
+  Reference reference = 5;
+  // the return line (recorded as the movement's line reference)
+  string line_id = 6;
+  // YYYY-MM-DD; empty: the legal entity's today
+  string business_date = 7;
+}
+
+message ReturnResponse {
+  string return_id = 1;
+  string movement_id = 2;
 }

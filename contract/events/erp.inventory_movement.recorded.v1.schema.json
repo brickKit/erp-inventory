@@ -30,9 +30,10 @@
     "kind": {
       "enum": [
         "receipt",
-        "issue"
+        "issue",
+        "purchase_return"
       ],
-      "description": "later: transfer, adjustment, opening, sales_return, purchase_return"
+      "description": "later: transfer, adjustment, opening, sales_return"
     },
     "product_id": {
       "type": "string",
@@ -167,6 +168,14 @@
     "recorded_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "origin_movement_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "a purchase return's original receipt movement (3.0.37); absent or null otherwise"
     }
   }
 }

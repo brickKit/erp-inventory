@@ -1476,6 +1476,376 @@ func (x *PositionsResponse) GetPositions() []*Position {
 	return nil
 }
 
+type ReceiveLine struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// the purchase receipt line (recorded as the movement's line reference)
+	LineId    string `protobuf:"bytes,1,opt,name=line_id,json=lineId,proto3" json:"line_id,omitempty"`
+	ProductId string `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// > 0, base unit
+	Quantity string `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	// the batch of a batch-tracked product
+	Batch string `protobuf:"bytes,4,opt,name=batch,proto3" json:"batch,omitempty"`
+	// a serial-tracked product's serial numbers, exactly quantity of them
+	Serials       []string `protobuf:"bytes,5,rep,name=serials,proto3" json:"serials,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReceiveLine) Reset() {
+	*x = ReceiveLine{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReceiveLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReceiveLine) ProtoMessage() {}
+
+func (x *ReceiveLine) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReceiveLine.ProtoReflect.Descriptor instead.
+func (*ReceiveLine) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ReceiveLine) GetLineId() string {
+	if x != nil {
+		return x.LineId
+	}
+	return ""
+}
+
+func (x *ReceiveLine) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *ReceiveLine) GetQuantity() string {
+	if x != nil {
+		return x.Quantity
+	}
+	return ""
+}
+
+func (x *ReceiveLine) GetBatch() string {
+	if x != nil {
+		return x.Batch
+	}
+	return ""
+}
+
+func (x *ReceiveLine) GetSerials() []string {
+	if x != nil {
+		return x.Serials
+	}
+	return nil
+}
+
+type ReceiveRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReceiptId     string                 `protobuf:"bytes,1,opt,name=receipt_id,json=receiptId,proto3" json:"receipt_id,omitempty"`
+	LegalEntityId string                 `protobuf:"bytes,2,opt,name=legal_entity_id,json=legalEntityId,proto3" json:"legal_entity_id,omitempty"`
+	// it must belong to the legal entity and be usable
+	WarehouseId string `protobuf:"bytes,3,opt,name=warehouse_id,json=warehouseId,proto3" json:"warehouse_id,omitempty"`
+	// e.g. kind "purchase_receipt", id the purchase order, revision the order's revision
+	Reference *Reference `protobuf:"bytes,4,opt,name=reference,proto3" json:"reference,omitempty"`
+	// YYYY-MM-DD; empty: the legal entity's today
+	BusinessDate  string         `protobuf:"bytes,5,opt,name=business_date,json=businessDate,proto3" json:"business_date,omitempty"`
+	Lines         []*ReceiveLine `protobuf:"bytes,6,rep,name=lines,proto3" json:"lines,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReceiveRequest) Reset() {
+	*x = ReceiveRequest{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReceiveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReceiveRequest) ProtoMessage() {}
+
+func (x *ReceiveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReceiveRequest.ProtoReflect.Descriptor instead.
+func (*ReceiveRequest) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReceiveRequest) GetReceiptId() string {
+	if x != nil {
+		return x.ReceiptId
+	}
+	return ""
+}
+
+func (x *ReceiveRequest) GetLegalEntityId() string {
+	if x != nil {
+		return x.LegalEntityId
+	}
+	return ""
+}
+
+func (x *ReceiveRequest) GetWarehouseId() string {
+	if x != nil {
+		return x.WarehouseId
+	}
+	return ""
+}
+
+func (x *ReceiveRequest) GetReference() *Reference {
+	if x != nil {
+		return x.Reference
+	}
+	return nil
+}
+
+func (x *ReceiveRequest) GetBusinessDate() string {
+	if x != nil {
+		return x.BusinessDate
+	}
+	return ""
+}
+
+func (x *ReceiveRequest) GetLines() []*ReceiveLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+type ReceiveResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ReceiptId string                 `protobuf:"bytes,1,opt,name=receipt_id,json=receiptId,proto3" json:"receipt_id,omitempty"`
+	// one per line, in the lines' order
+	MovementIds   []string `protobuf:"bytes,2,rep,name=movement_ids,json=movementIds,proto3" json:"movement_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReceiveResponse) Reset() {
+	*x = ReceiveResponse{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReceiveResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReceiveResponse) ProtoMessage() {}
+
+func (x *ReceiveResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReceiveResponse.ProtoReflect.Descriptor instead.
+func (*ReceiveResponse) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ReceiveResponse) GetReceiptId() string {
+	if x != nil {
+		return x.ReceiptId
+	}
+	return ""
+}
+
+func (x *ReceiveResponse) GetMovementIds() []string {
+	if x != nil {
+		return x.MovementIds
+	}
+	return nil
+}
+
+type ReturnRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ReturnId string                 `protobuf:"bytes,1,opt,name=return_id,json=returnId,proto3" json:"return_id,omitempty"`
+	// the receipt movement returned from: its product, warehouse, legal entity and batch
+	OriginMovementId string `protobuf:"bytes,2,opt,name=origin_movement_id,json=originMovementId,proto3" json:"origin_movement_id,omitempty"`
+	// > 0, base unit
+	Quantity string `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	// a serial-tracked product's serial numbers, from the original receipt and still in its warehouse
+	Serials []string `protobuf:"bytes,4,rep,name=serials,proto3" json:"serials,omitempty"`
+	// e.g. kind "purchase_return", id the return document
+	Reference *Reference `protobuf:"bytes,5,opt,name=reference,proto3" json:"reference,omitempty"`
+	// the return line (recorded as the movement's line reference)
+	LineId string `protobuf:"bytes,6,opt,name=line_id,json=lineId,proto3" json:"line_id,omitempty"`
+	// YYYY-MM-DD; empty: the legal entity's today
+	BusinessDate  string `protobuf:"bytes,7,opt,name=business_date,json=businessDate,proto3" json:"business_date,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReturnRequest) Reset() {
+	*x = ReturnRequest{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReturnRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReturnRequest) ProtoMessage() {}
+
+func (x *ReturnRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReturnRequest.ProtoReflect.Descriptor instead.
+func (*ReturnRequest) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ReturnRequest) GetReturnId() string {
+	if x != nil {
+		return x.ReturnId
+	}
+	return ""
+}
+
+func (x *ReturnRequest) GetOriginMovementId() string {
+	if x != nil {
+		return x.OriginMovementId
+	}
+	return ""
+}
+
+func (x *ReturnRequest) GetQuantity() string {
+	if x != nil {
+		return x.Quantity
+	}
+	return ""
+}
+
+func (x *ReturnRequest) GetSerials() []string {
+	if x != nil {
+		return x.Serials
+	}
+	return nil
+}
+
+func (x *ReturnRequest) GetReference() *Reference {
+	if x != nil {
+		return x.Reference
+	}
+	return nil
+}
+
+func (x *ReturnRequest) GetLineId() string {
+	if x != nil {
+		return x.LineId
+	}
+	return ""
+}
+
+func (x *ReturnRequest) GetBusinessDate() string {
+	if x != nil {
+		return x.BusinessDate
+	}
+	return ""
+}
+
+type ReturnResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ReturnId      string                 `protobuf:"bytes,1,opt,name=return_id,json=returnId,proto3" json:"return_id,omitempty"`
+	MovementId    string                 `protobuf:"bytes,2,opt,name=movement_id,json=movementId,proto3" json:"movement_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReturnResponse) Reset() {
+	*x = ReturnResponse{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReturnResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReturnResponse) ProtoMessage() {}
+
+func (x *ReturnResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReturnResponse.ProtoReflect.Descriptor instead.
+func (*ReturnResponse) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ReturnResponse) GetReturnId() string {
+	if x != nil {
+		return x.ReturnId
+	}
+	return ""
+}
+
+func (x *ReturnResponse) GetMovementId() string {
+	if x != nil {
+		return x.MovementId
+	}
+	return ""
+}
+
 var File_be_erp_inventory_v3_inventory_proto protoreflect.FileDescriptor
 
 const file_be_erp_inventory_v3_inventory_proto_rawDesc = "" +
@@ -1576,7 +1946,38 @@ const file_be_erp_inventory_v3_inventory_proto_rawDesc = "" +
 	"\x10PositionsRequest\x124\n" +
 	"\x04keys\x18\x01 \x03(\v2 .be.erp.inventory.v3.PositionKeyR\x04keys\"P\n" +
 	"\x11PositionsResponse\x12;\n" +
-	"\tpositions\x18\x01 \x03(\v2\x1d.be.erp.inventory.v3.PositionR\tpositions*\xfe\x01\n" +
+	"\tpositions\x18\x01 \x03(\v2\x1d.be.erp.inventory.v3.PositionR\tpositions\"\x91\x01\n" +
+	"\vReceiveLine\x12\x17\n" +
+	"\aline_id\x18\x01 \x01(\tR\x06lineId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\tR\tproductId\x12\x1a\n" +
+	"\bquantity\x18\x03 \x01(\tR\bquantity\x12\x14\n" +
+	"\x05batch\x18\x04 \x01(\tR\x05batch\x12\x18\n" +
+	"\aserials\x18\x05 \x03(\tR\aserials\"\x95\x02\n" +
+	"\x0eReceiveRequest\x12\x1d\n" +
+	"\n" +
+	"receipt_id\x18\x01 \x01(\tR\treceiptId\x12&\n" +
+	"\x0flegal_entity_id\x18\x02 \x01(\tR\rlegalEntityId\x12!\n" +
+	"\fwarehouse_id\x18\x03 \x01(\tR\vwarehouseId\x12<\n" +
+	"\treference\x18\x04 \x01(\v2\x1e.be.erp.inventory.v3.ReferenceR\treference\x12#\n" +
+	"\rbusiness_date\x18\x05 \x01(\tR\fbusinessDate\x126\n" +
+	"\x05lines\x18\x06 \x03(\v2 .be.erp.inventory.v3.ReceiveLineR\x05lines\"S\n" +
+	"\x0fReceiveResponse\x12\x1d\n" +
+	"\n" +
+	"receipt_id\x18\x01 \x01(\tR\treceiptId\x12!\n" +
+	"\fmovement_ids\x18\x02 \x03(\tR\vmovementIds\"\x8c\x02\n" +
+	"\rReturnRequest\x12\x1b\n" +
+	"\treturn_id\x18\x01 \x01(\tR\breturnId\x12,\n" +
+	"\x12origin_movement_id\x18\x02 \x01(\tR\x10originMovementId\x12\x1a\n" +
+	"\bquantity\x18\x03 \x01(\tR\bquantity\x12\x18\n" +
+	"\aserials\x18\x04 \x03(\tR\aserials\x12<\n" +
+	"\treference\x18\x05 \x01(\v2\x1e.be.erp.inventory.v3.ReferenceR\treference\x12\x17\n" +
+	"\aline_id\x18\x06 \x01(\tR\x06lineId\x12#\n" +
+	"\rbusiness_date\x18\a \x01(\tR\fbusinessDate\"N\n" +
+	"\x0eReturnResponse\x12\x1b\n" +
+	"\treturn_id\x18\x01 \x01(\tR\breturnId\x12\x1f\n" +
+	"\vmovement_id\x18\x02 \x01(\tR\n" +
+	"movementId*\xfe\x01\n" +
 	"\vBranchState\x12\x1c\n" +
 	"\x18BRANCH_STATE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11BRANCH_STATE_HELD\x10\x01\x12\x1a\n" +
@@ -1592,10 +1993,12 @@ const file_be_erp_inventory_v3_inventory_proto_rawDesc = "" +
 	"\aConfirm\x12#.be.erp.inventory.v3.ConfirmRequest\x1a$.be.erp.inventory.v3.ConfirmResponse\x12Q\n" +
 	"\x06Cancel\x12\".be.erp.inventory.v3.CancelRequest\x1a#.be.erp.inventory.v3.CancelResponse\x12N\n" +
 	"\x05Query\x12!.be.erp.inventory.v3.QueryRequest\x1a\".be.erp.inventory.v3.QueryResponse\x12Q\n" +
-	"\x06Adjust\x12\".be.erp.inventory.v3.AdjustRequest\x1a#.be.erp.inventory.v3.AdjustResponse2\xba\x01\n" +
+	"\x06Adjust\x12\".be.erp.inventory.v3.AdjustRequest\x1a#.be.erp.inventory.v3.AdjustResponse2\xe3\x02\n" +
 	"\fStockService\x12N\n" +
 	"\x05Issue\x12!.be.erp.inventory.v3.IssueRequest\x1a\".be.erp.inventory.v3.IssueResponse\x12Z\n" +
-	"\tPositions\x12%.be.erp.inventory.v3.PositionsRequest\x1a&.be.erp.inventory.v3.PositionsResponseBVZTgithub.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3;inventoryv3b\x06proto3"
+	"\tPositions\x12%.be.erp.inventory.v3.PositionsRequest\x1a&.be.erp.inventory.v3.PositionsResponse\x12T\n" +
+	"\aReceive\x12#.be.erp.inventory.v3.ReceiveRequest\x1a$.be.erp.inventory.v3.ReceiveResponse\x12Q\n" +
+	"\x06Return\x12\".be.erp.inventory.v3.ReturnRequest\x1a#.be.erp.inventory.v3.ReturnResponseBVZTgithub.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3;inventoryv3b\x06proto3"
 
 var (
 	file_be_erp_inventory_v3_inventory_proto_rawDescOnce sync.Once
@@ -1610,7 +2013,7 @@ func file_be_erp_inventory_v3_inventory_proto_rawDescGZIP() []byte {
 }
 
 var file_be_erp_inventory_v3_inventory_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_be_erp_inventory_v3_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_be_erp_inventory_v3_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_be_erp_inventory_v3_inventory_proto_goTypes = []any{
 	(BranchState)(0),          // 0: be.erp.inventory.v3.BranchState
 	(*Reference)(nil),         // 1: be.erp.inventory.v3.Reference
@@ -1636,6 +2039,11 @@ var file_be_erp_inventory_v3_inventory_proto_goTypes = []any{
 	(*Position)(nil),          // 21: be.erp.inventory.v3.Position
 	(*PositionsRequest)(nil),  // 22: be.erp.inventory.v3.PositionsRequest
 	(*PositionsResponse)(nil), // 23: be.erp.inventory.v3.PositionsResponse
+	(*ReceiveLine)(nil),       // 24: be.erp.inventory.v3.ReceiveLine
+	(*ReceiveRequest)(nil),    // 25: be.erp.inventory.v3.ReceiveRequest
+	(*ReceiveResponse)(nil),   // 26: be.erp.inventory.v3.ReceiveResponse
+	(*ReturnRequest)(nil),     // 27: be.erp.inventory.v3.ReturnRequest
+	(*ReturnResponse)(nil),    // 28: be.erp.inventory.v3.ReturnResponse
 }
 var file_be_erp_inventory_v3_inventory_proto_depIdxs = []int32{
 	1,  // 0: be.erp.inventory.v3.HoldRequest.reference:type_name -> be.erp.inventory.v3.Reference
@@ -1655,25 +2063,32 @@ var file_be_erp_inventory_v3_inventory_proto_depIdxs = []int32{
 	18, // 14: be.erp.inventory.v3.IssueResponse.problems:type_name -> be.erp.inventory.v3.IssueProblem
 	20, // 15: be.erp.inventory.v3.PositionsRequest.keys:type_name -> be.erp.inventory.v3.PositionKey
 	21, // 16: be.erp.inventory.v3.PositionsResponse.positions:type_name -> be.erp.inventory.v3.Position
-	3,  // 17: be.erp.inventory.v3.ReservationService.Hold:input_type -> be.erp.inventory.v3.HoldRequest
-	4,  // 18: be.erp.inventory.v3.ReservationService.Confirm:input_type -> be.erp.inventory.v3.ConfirmRequest
-	5,  // 19: be.erp.inventory.v3.ReservationService.Cancel:input_type -> be.erp.inventory.v3.CancelRequest
-	6,  // 20: be.erp.inventory.v3.ReservationService.Query:input_type -> be.erp.inventory.v3.QueryRequest
-	7,  // 21: be.erp.inventory.v3.ReservationService.Adjust:input_type -> be.erp.inventory.v3.AdjustRequest
-	17, // 22: be.erp.inventory.v3.StockService.Issue:input_type -> be.erp.inventory.v3.IssueRequest
-	22, // 23: be.erp.inventory.v3.StockService.Positions:input_type -> be.erp.inventory.v3.PositionsRequest
-	11, // 24: be.erp.inventory.v3.ReservationService.Hold:output_type -> be.erp.inventory.v3.HoldResponse
-	12, // 25: be.erp.inventory.v3.ReservationService.Confirm:output_type -> be.erp.inventory.v3.ConfirmResponse
-	13, // 26: be.erp.inventory.v3.ReservationService.Cancel:output_type -> be.erp.inventory.v3.CancelResponse
-	14, // 27: be.erp.inventory.v3.ReservationService.Query:output_type -> be.erp.inventory.v3.QueryResponse
-	15, // 28: be.erp.inventory.v3.ReservationService.Adjust:output_type -> be.erp.inventory.v3.AdjustResponse
-	19, // 29: be.erp.inventory.v3.StockService.Issue:output_type -> be.erp.inventory.v3.IssueResponse
-	23, // 30: be.erp.inventory.v3.StockService.Positions:output_type -> be.erp.inventory.v3.PositionsResponse
-	24, // [24:31] is the sub-list for method output_type
-	17, // [17:24] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	1,  // 17: be.erp.inventory.v3.ReceiveRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	24, // 18: be.erp.inventory.v3.ReceiveRequest.lines:type_name -> be.erp.inventory.v3.ReceiveLine
+	1,  // 19: be.erp.inventory.v3.ReturnRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	3,  // 20: be.erp.inventory.v3.ReservationService.Hold:input_type -> be.erp.inventory.v3.HoldRequest
+	4,  // 21: be.erp.inventory.v3.ReservationService.Confirm:input_type -> be.erp.inventory.v3.ConfirmRequest
+	5,  // 22: be.erp.inventory.v3.ReservationService.Cancel:input_type -> be.erp.inventory.v3.CancelRequest
+	6,  // 23: be.erp.inventory.v3.ReservationService.Query:input_type -> be.erp.inventory.v3.QueryRequest
+	7,  // 24: be.erp.inventory.v3.ReservationService.Adjust:input_type -> be.erp.inventory.v3.AdjustRequest
+	17, // 25: be.erp.inventory.v3.StockService.Issue:input_type -> be.erp.inventory.v3.IssueRequest
+	22, // 26: be.erp.inventory.v3.StockService.Positions:input_type -> be.erp.inventory.v3.PositionsRequest
+	25, // 27: be.erp.inventory.v3.StockService.Receive:input_type -> be.erp.inventory.v3.ReceiveRequest
+	27, // 28: be.erp.inventory.v3.StockService.Return:input_type -> be.erp.inventory.v3.ReturnRequest
+	11, // 29: be.erp.inventory.v3.ReservationService.Hold:output_type -> be.erp.inventory.v3.HoldResponse
+	12, // 30: be.erp.inventory.v3.ReservationService.Confirm:output_type -> be.erp.inventory.v3.ConfirmResponse
+	13, // 31: be.erp.inventory.v3.ReservationService.Cancel:output_type -> be.erp.inventory.v3.CancelResponse
+	14, // 32: be.erp.inventory.v3.ReservationService.Query:output_type -> be.erp.inventory.v3.QueryResponse
+	15, // 33: be.erp.inventory.v3.ReservationService.Adjust:output_type -> be.erp.inventory.v3.AdjustResponse
+	19, // 34: be.erp.inventory.v3.StockService.Issue:output_type -> be.erp.inventory.v3.IssueResponse
+	23, // 35: be.erp.inventory.v3.StockService.Positions:output_type -> be.erp.inventory.v3.PositionsResponse
+	26, // 36: be.erp.inventory.v3.StockService.Receive:output_type -> be.erp.inventory.v3.ReceiveResponse
+	28, // 37: be.erp.inventory.v3.StockService.Return:output_type -> be.erp.inventory.v3.ReturnResponse
+	29, // [29:38] is the sub-list for method output_type
+	20, // [20:29] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_be_erp_inventory_v3_inventory_proto_init() }
@@ -1687,7 +2102,7 @@ func file_be_erp_inventory_v3_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_be_erp_inventory_v3_inventory_proto_rawDesc), len(file_be_erp_inventory_v3_inventory_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

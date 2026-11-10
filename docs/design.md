@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | 仓库与库位 | 仓库属于一个法人；库位是仓库内的位置（以后） | `warehouse`；`location`（以后） |
 | 库存维度 | 产品、仓库、库位、批次、序列号、库存状态、货主；本版只有产品、仓库、批次、序列号（货主固定为本企业，库存状态都是可用） | `product_id`、`warehouse_id`、`batch`、`serial` |
-| 流水 | 一次不可修改的库存变动，数量用产品的基本单位；更正以反向流水表达。类型：入库、出库、调拨、调整、期初、销售退货、采购退货；本版只有前两种 | `movement`；类型 `receipt`、`issue`（以后 `transfer`、`adjustment`、`opening`、`sales_return`、`purchase_return`） |
+| 流水 | 一次不可修改的库存变动，数量用产品的基本单位；更正以反向流水表达。类型：入库、出库、调拨、调整、期初、销售退货、采购退货；本版有入库、出库与采购退货（3.0.37 起） | `movement`；类型 `receipt`、`issue`、`purchase_return`（以后 `transfer`、`adjustment`、`opening`、`sales_return`） |
 | 在库、已预占、可用 | 在库是流水的累计；已预占是 `held` 与 `committed` 分支未消耗的部分；可用 = 在库 − 已预占 | `on_hand`、`reserved`、`available` |
 | 预占分支 | 一张订单一次确认在本组件的一条分支，含该订单的全部实物明细（协议 04） | `branch`；状态 `held`、`committed`、`consumed`、`released`、`expired`、`rejected`、`cancelled` |
 | 消耗 | 出库在同一个事务里扣减分支的数量，按消耗身份幂等 | `consumption_id` |
@@ -56,6 +56,8 @@
 - 流水不可修改。流水提交时不带序号；提交之后由编号事务按协议 02 第 2 步的做法锁内连续编号：先编库存流水序号，再按“产品 + 法人”编计价序号，流水事件在计价编号的事务里写进发件表，所以总带着两个序号。出入库提交后立刻编一次，失败或遗漏由每秒一次的单例工作项补上（实现时定）。
 - 入库的数量与单位：契约里的数量是产品的基本单位，十进制字符串，按单位的小数位校验，不经浮点。
 - 倒填流水（业务日期早于今天）的限制是库存自己的业务规则；会计上的迟到由成本组件顺延到下一期（协议 06），库存不看会计期间。
+- **采购收货**（3.0.37，系统面 `StockService.Receive`，只许采购组件）：采购发起入库，按收货身份（`receipt_id`）幂等：同身份同内容答原来的流水，内容不同拒绝；每行带收货行参考（流水的 `ref_kind` 为 `purchase_receipt`，`ref_id` 是采购订单，`ref_line_id` 是收货行），收货数量以这里的入库流水为准（采购按流水事件补齐进度）。追踪政策的检查与手工入库相同。
+- **采购退货**（3.0.37，系统面 `StockService.Return`，只许采购组件）：引用一条原入库流水（`origin_movement_id`），在它的仓库按它的批次出库，类型 `purchase_return`；数量不超过原流水减去它已退的；序列号追踪的产品指定序列号，必须是原流水入库、此刻仍在这个仓库的；按退货身份（`return_id`）幂等。退货的可用量检查与不带分支的出库相同：在库减已预占不够就拒绝，整笔拒绝。
 - 调整需要审批或权限（以后）。
 
 ## 命令与查询
@@ -65,6 +67,7 @@
 | 预占、确认、取消、查询（协议 04 的参与方命令；消耗随出库） | 系统面 `ReservationService` | `erp.inventory.system` 的 `erp.inventory.system.reserve`，只授予声明的协调者（`erp/sales`）的服务身份 |
 | 出库并消耗分支（带分支身份与消耗身份，明细可指定批次或序列号） | 系统面 `StockService.Issue` | `erp.inventory.system.issue`，同上 |
 | 余额与可用量的系统读取（`StockService.Positions`） | 系统面 | `erp.inventory.system.read` |
+| 采购收货、采购退货（3.0.37） | 系统面 `StockService.Receive`、`StockService.Return` | `erp.inventory.system.receive`，只授予采购组件（`erp/purchase`）的服务身份 |
 | 入库（本版给种子与手工收货用，带 `Idempotency-Key`） | 用户面 | `erp.inventory.movement` 的 `erp.inventory.movement.create` |
 | 流水列表与单条读取 | 用户面 | `erp.inventory.movement.read` |
 | 余额与可用量的列表 | 用户面 | `erp.inventory.stock` 的 `erp.inventory.stock.read` |
@@ -99,6 +102,8 @@
 - `erp/warehouse`：经库存契约执行作业；缺时由简单操作直接出入库。
 
 ## 实现状态
+
+3.0.37（装配项目阶段计划 C2 的 P0b，采购要它）：采购收货与采购退货的系统面（`StockService.Receive`、`Return`，操作 `erp.inventory.system.receive`，契约 alpha.2）；流水种类 `purchase_return` 与原入库流水（`origin_movement_id`，事件里也带）。
 
 3.0.36：be-sdk-go alpha.121（全系统同一个 SDK 版本；sectest 的授权组件替身答 CheckLinkChange 与 Administrators）
 
