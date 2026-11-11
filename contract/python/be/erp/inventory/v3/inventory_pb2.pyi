@@ -28,6 +28,28 @@ BRANCH_STATE_REJECTED: BranchState
 BRANCH_STATE_CANCELLED: BranchState
 BRANCH_STATE_ABSENT: BranchState
 
+class MovementsRequest(_message.Message):
+    __slots__ = ("legal_entity_id", "product_id", "valuation_epoch", "from_seq", "limit")
+    LEGAL_ENTITY_ID_FIELD_NUMBER: _ClassVar[int]
+    PRODUCT_ID_FIELD_NUMBER: _ClassVar[int]
+    VALUATION_EPOCH_FIELD_NUMBER: _ClassVar[int]
+    FROM_SEQ_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    legal_entity_id: str
+    product_id: str
+    valuation_epoch: str
+    from_seq: int
+    limit: int
+    def __init__(self, legal_entity_id: _Optional[str] = ..., product_id: _Optional[str] = ..., valuation_epoch: _Optional[str] = ..., from_seq: _Optional[int] = ..., limit: _Optional[int] = ...) -> None: ...
+
+class MovementsResponse(_message.Message):
+    __slots__ = ("movements", "last_seq")
+    MOVEMENTS_FIELD_NUMBER: _ClassVar[int]
+    LAST_SEQ_FIELD_NUMBER: _ClassVar[int]
+    movements: _containers.RepeatedScalarFieldContainer[bytes]
+    last_seq: int
+    def __init__(self, movements: _Optional[_Iterable[bytes]] = ..., last_seq: _Optional[int] = ...) -> None: ...
+
 class Reference(_message.Message):
     __slots__ = ("kind", "id", "revision")
     KIND_FIELD_NUMBER: _ClassVar[int]

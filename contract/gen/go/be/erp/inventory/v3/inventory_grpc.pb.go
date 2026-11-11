@@ -302,6 +302,7 @@ const (
 	StockService_Positions_FullMethodName = "/be.erp.inventory.v3.StockService/Positions"
 	StockService_Receive_FullMethodName   = "/be.erp.inventory.v3.StockService/Receive"
 	StockService_Return_FullMethodName    = "/be.erp.inventory.v3.StockService/Return"
+	StockService_Movements_FullMethodName = "/be.erp.inventory.v3.StockService/Movements"
 )
 
 // StockServiceClient is the client API for StockService service.
@@ -323,6 +324,10 @@ type StockServiceClient interface {
 	// component only): idempotent by return_id; at most what the original received and has not returned, within what
 	// is available.
 	Return(ctx context.Context, in *ReturnRequest, opts ...grpc.CallOption) (*ReturnResponse, error)
+	// Movements reads one legal entity's movements of one product by their valuation sequence (alpha.3; the costing
+	// component only): those numbered in the epoch from from_seq on, in their order, at most limit (0: 200, at most
+	// 1000); a consumer that finds a gap reads it back here (protocol 05b, "计算与缺口").
+	Movements(ctx context.Context, in *MovementsRequest, opts ...grpc.CallOption) (*MovementsResponse, error)
 }
 
 type stockServiceClient struct {
@@ -373,6 +378,16 @@ func (c *stockServiceClient) Return(ctx context.Context, in *ReturnRequest, opts
 	return out, nil
 }
 
+func (c *stockServiceClient) Movements(ctx context.Context, in *MovementsRequest, opts ...grpc.CallOption) (*MovementsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MovementsResponse)
+	err := c.cc.Invoke(ctx, StockService_Movements_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StockServiceServer is the server API for StockService service.
 // All implementations must embed UnimplementedStockServiceServer
 // for forward compatibility.
@@ -392,6 +407,10 @@ type StockServiceServer interface {
 	// component only): idempotent by return_id; at most what the original received and has not returned, within what
 	// is available.
 	Return(context.Context, *ReturnRequest) (*ReturnResponse, error)
+	// Movements reads one legal entity's movements of one product by their valuation sequence (alpha.3; the costing
+	// component only): those numbered in the epoch from from_seq on, in their order, at most limit (0: 200, at most
+	// 1000); a consumer that finds a gap reads it back here (protocol 05b, "计算与缺口").
+	Movements(context.Context, *MovementsRequest) (*MovementsResponse, error)
 	mustEmbedUnimplementedStockServiceServer()
 }
 
@@ -413,6 +432,9 @@ func (UnimplementedStockServiceServer) Receive(context.Context, *ReceiveRequest)
 }
 func (UnimplementedStockServiceServer) Return(context.Context, *ReturnRequest) (*ReturnResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Return not implemented")
+}
+func (UnimplementedStockServiceServer) Movements(context.Context, *MovementsRequest) (*MovementsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Movements not implemented")
 }
 func (UnimplementedStockServiceServer) mustEmbedUnimplementedStockServiceServer() {}
 func (UnimplementedStockServiceServer) testEmbeddedByValue()                      {}
@@ -507,6 +529,24 @@ func _StockService_Return_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StockService_Movements_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MovementsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StockServiceServer).Movements(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StockService_Movements_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StockServiceServer).Movements(ctx, req.(*MovementsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StockService_ServiceDesc is the grpc.ServiceDesc for StockService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -529,6 +569,10 @@ var StockService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Return",
 			Handler:    _StockService_Return_Handler,
+		},
+		{
+			MethodName: "Movements",
+			Handler:    _StockService_Movements_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

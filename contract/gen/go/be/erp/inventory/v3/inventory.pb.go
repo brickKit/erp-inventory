@@ -95,6 +95,138 @@ func (BranchState) EnumDescriptor() ([]byte, []int) {
 	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{0}
 }
 
+type MovementsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LegalEntityId string                 `protobuf:"bytes,1,opt,name=legal_entity_id,json=legalEntityId,proto3" json:"legal_entity_id,omitempty"`
+	ProductId     string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// the valuation sequence's epoch (a full recovery starts a new one)
+	ValuationEpoch string `protobuf:"bytes,3,opt,name=valuation_epoch,json=valuationEpoch,proto3" json:"valuation_epoch,omitempty"`
+	// the first valuation sequence number wanted
+	FromSeq       int64 `protobuf:"varint,4,opt,name=from_seq,json=fromSeq,proto3" json:"from_seq,omitempty"`
+	Limit         int32 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MovementsRequest) Reset() {
+	*x = MovementsRequest{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MovementsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MovementsRequest) ProtoMessage() {}
+
+func (x *MovementsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MovementsRequest.ProtoReflect.Descriptor instead.
+func (*MovementsRequest) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *MovementsRequest) GetLegalEntityId() string {
+	if x != nil {
+		return x.LegalEntityId
+	}
+	return ""
+}
+
+func (x *MovementsRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *MovementsRequest) GetValuationEpoch() string {
+	if x != nil {
+		return x.ValuationEpoch
+	}
+	return ""
+}
+
+func (x *MovementsRequest) GetFromSeq() int64 {
+	if x != nil {
+		return x.FromSeq
+	}
+	return 0
+}
+
+func (x *MovementsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type MovementsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// each the payload of erp.inventory_movement.recorded.v1 (JSON), by valuation sequence
+	Movements [][]byte `protobuf:"bytes,1,rep,name=movements,proto3" json:"movements,omitempty"`
+	// the highest valuation sequence numbered in the epoch for the pair (0: none)
+	LastSeq       int64 `protobuf:"varint,2,opt,name=last_seq,json=lastSeq,proto3" json:"last_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MovementsResponse) Reset() {
+	*x = MovementsResponse{}
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MovementsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MovementsResponse) ProtoMessage() {}
+
+func (x *MovementsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MovementsResponse.ProtoReflect.Descriptor instead.
+func (*MovementsResponse) Descriptor() ([]byte, []int) {
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MovementsResponse) GetMovements() [][]byte {
+	if x != nil {
+		return x.Movements
+	}
+	return nil
+}
+
+func (x *MovementsResponse) GetLastSeq() int64 {
+	if x != nil {
+		return x.LastSeq
+	}
+	return 0
+}
+
 // Reference names the coordinator's document; it is recorded, never interpreted.
 type Reference struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -109,7 +241,7 @@ type Reference struct {
 
 func (x *Reference) Reset() {
 	*x = Reference{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[0]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -121,7 +253,7 @@ func (x *Reference) String() string {
 func (*Reference) ProtoMessage() {}
 
 func (x *Reference) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[0]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,7 +266,7 @@ func (x *Reference) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reference.ProtoReflect.Descriptor instead.
 func (*Reference) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{0}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Reference) GetKind() string {
@@ -170,7 +302,7 @@ type HoldLine struct {
 
 func (x *HoldLine) Reset() {
 	*x = HoldLine{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[1]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -182,7 +314,7 @@ func (x *HoldLine) String() string {
 func (*HoldLine) ProtoMessage() {}
 
 func (x *HoldLine) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[1]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -195,7 +327,7 @@ func (x *HoldLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoldLine.ProtoReflect.Descriptor instead.
 func (*HoldLine) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{1}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HoldLine) GetProductId() string {
@@ -232,7 +364,7 @@ type HoldRequest struct {
 
 func (x *HoldRequest) Reset() {
 	*x = HoldRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[2]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +376,7 @@ func (x *HoldRequest) String() string {
 func (*HoldRequest) ProtoMessage() {}
 
 func (x *HoldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[2]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +389,7 @@ func (x *HoldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoldRequest.ProtoReflect.Descriptor instead.
 func (*HoldRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{2}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HoldRequest) GetBranchId() string {
@@ -297,7 +429,7 @@ type ConfirmRequest struct {
 
 func (x *ConfirmRequest) Reset() {
 	*x = ConfirmRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[3]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -309,7 +441,7 @@ func (x *ConfirmRequest) String() string {
 func (*ConfirmRequest) ProtoMessage() {}
 
 func (x *ConfirmRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[3]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -322,7 +454,7 @@ func (x *ConfirmRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{3}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ConfirmRequest) GetBranchId() string {
@@ -341,7 +473,7 @@ type CancelRequest struct {
 
 func (x *CancelRequest) Reset() {
 	*x = CancelRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[4]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +485,7 @@ func (x *CancelRequest) String() string {
 func (*CancelRequest) ProtoMessage() {}
 
 func (x *CancelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[4]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +498,7 @@ func (x *CancelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelRequest.ProtoReflect.Descriptor instead.
 func (*CancelRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{4}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CancelRequest) GetBranchId() string {
@@ -385,7 +517,7 @@ type QueryRequest struct {
 
 func (x *QueryRequest) Reset() {
 	*x = QueryRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[5]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -397,7 +529,7 @@ func (x *QueryRequest) String() string {
 func (*QueryRequest) ProtoMessage() {}
 
 func (x *QueryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[5]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -410,7 +542,7 @@ func (x *QueryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryRequest.ProtoReflect.Descriptor instead.
 func (*QueryRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{5}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *QueryRequest) GetBranchId() string {
@@ -431,7 +563,7 @@ type AdjustRequest struct {
 
 func (x *AdjustRequest) Reset() {
 	*x = AdjustRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[6]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -443,7 +575,7 @@ func (x *AdjustRequest) String() string {
 func (*AdjustRequest) ProtoMessage() {}
 
 func (x *AdjustRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[6]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +588,7 @@ func (x *AdjustRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdjustRequest.ProtoReflect.Descriptor instead.
 func (*AdjustRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{6}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AdjustRequest) GetBranchId() string {
@@ -492,7 +624,7 @@ type BranchLine struct {
 
 func (x *BranchLine) Reset() {
 	*x = BranchLine{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[7]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +636,7 @@ func (x *BranchLine) String() string {
 func (*BranchLine) ProtoMessage() {}
 
 func (x *BranchLine) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[7]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +649,7 @@ func (x *BranchLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BranchLine.ProtoReflect.Descriptor instead.
 func (*BranchLine) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{7}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *BranchLine) GetProductId() string {
@@ -564,7 +696,7 @@ type Shortage struct {
 
 func (x *Shortage) Reset() {
 	*x = Shortage{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[8]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -576,7 +708,7 @@ func (x *Shortage) String() string {
 func (*Shortage) ProtoMessage() {}
 
 func (x *Shortage) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[8]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -589,7 +721,7 @@ func (x *Shortage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Shortage.ProtoReflect.Descriptor instead.
 func (*Shortage) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{8}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Shortage) GetProductId() string {
@@ -645,7 +777,7 @@ type Branch struct {
 
 func (x *Branch) Reset() {
 	*x = Branch{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[9]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -657,7 +789,7 @@ func (x *Branch) String() string {
 func (*Branch) ProtoMessage() {}
 
 func (x *Branch) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[9]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -670,7 +802,7 @@ func (x *Branch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Branch.ProtoReflect.Descriptor instead.
 func (*Branch) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{9}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Branch) GetBranchId() string {
@@ -731,7 +863,7 @@ type HoldResponse struct {
 
 func (x *HoldResponse) Reset() {
 	*x = HoldResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[10]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -743,7 +875,7 @@ func (x *HoldResponse) String() string {
 func (*HoldResponse) ProtoMessage() {}
 
 func (x *HoldResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[10]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -756,7 +888,7 @@ func (x *HoldResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HoldResponse.ProtoReflect.Descriptor instead.
 func (*HoldResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{10}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HoldResponse) GetBranch() *Branch {
@@ -775,7 +907,7 @@ type ConfirmResponse struct {
 
 func (x *ConfirmResponse) Reset() {
 	*x = ConfirmResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[11]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +919,7 @@ func (x *ConfirmResponse) String() string {
 func (*ConfirmResponse) ProtoMessage() {}
 
 func (x *ConfirmResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[11]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +932,7 @@ func (x *ConfirmResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{11}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ConfirmResponse) GetBranch() *Branch {
@@ -819,7 +951,7 @@ type CancelResponse struct {
 
 func (x *CancelResponse) Reset() {
 	*x = CancelResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[12]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +963,7 @@ func (x *CancelResponse) String() string {
 func (*CancelResponse) ProtoMessage() {}
 
 func (x *CancelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[12]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,7 +976,7 @@ func (x *CancelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelResponse.ProtoReflect.Descriptor instead.
 func (*CancelResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{12}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CancelResponse) GetBranch() *Branch {
@@ -863,7 +995,7 @@ type QueryResponse struct {
 
 func (x *QueryResponse) Reset() {
 	*x = QueryResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[13]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -875,7 +1007,7 @@ func (x *QueryResponse) String() string {
 func (*QueryResponse) ProtoMessage() {}
 
 func (x *QueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[13]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -888,7 +1020,7 @@ func (x *QueryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryResponse.ProtoReflect.Descriptor instead.
 func (*QueryResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{13}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *QueryResponse) GetBranch() *Branch {
@@ -907,7 +1039,7 @@ type AdjustResponse struct {
 
 func (x *AdjustResponse) Reset() {
 	*x = AdjustResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[14]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -919,7 +1051,7 @@ func (x *AdjustResponse) String() string {
 func (*AdjustResponse) ProtoMessage() {}
 
 func (x *AdjustResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[14]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -932,7 +1064,7 @@ func (x *AdjustResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdjustResponse.ProtoReflect.Descriptor instead.
 func (*AdjustResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{14}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AdjustResponse) GetBranch() *Branch {
@@ -960,7 +1092,7 @@ type IssueLine struct {
 
 func (x *IssueLine) Reset() {
 	*x = IssueLine{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[15]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -972,7 +1104,7 @@ func (x *IssueLine) String() string {
 func (*IssueLine) ProtoMessage() {}
 
 func (x *IssueLine) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[15]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -985,7 +1117,7 @@ func (x *IssueLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueLine.ProtoReflect.Descriptor instead.
 func (*IssueLine) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{15}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *IssueLine) GetProductId() string {
@@ -1046,7 +1178,7 @@ type IssueRequest struct {
 
 func (x *IssueRequest) Reset() {
 	*x = IssueRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[16]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1058,7 +1190,7 @@ func (x *IssueRequest) String() string {
 func (*IssueRequest) ProtoMessage() {}
 
 func (x *IssueRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[16]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1203,7 @@ func (x *IssueRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueRequest.ProtoReflect.Descriptor instead.
 func (*IssueRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{16}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *IssueRequest) GetConsumptionId() string {
@@ -1123,7 +1255,7 @@ type IssueProblem struct {
 
 func (x *IssueProblem) Reset() {
 	*x = IssueProblem{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[17]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1135,7 +1267,7 @@ func (x *IssueProblem) String() string {
 func (*IssueProblem) ProtoMessage() {}
 
 func (x *IssueProblem) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[17]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1148,7 +1280,7 @@ func (x *IssueProblem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueProblem.ProtoReflect.Descriptor instead.
 func (*IssueProblem) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{17}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *IssueProblem) GetLine() int32 {
@@ -1188,7 +1320,7 @@ type IssueResponse struct {
 
 func (x *IssueResponse) Reset() {
 	*x = IssueResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[18]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1332,7 @@ func (x *IssueResponse) String() string {
 func (*IssueResponse) ProtoMessage() {}
 
 func (x *IssueResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[18]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1345,7 @@ func (x *IssueResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueResponse.ProtoReflect.Descriptor instead.
 func (*IssueResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{18}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *IssueResponse) GetConsumptionId() string {
@@ -1261,7 +1393,7 @@ type PositionKey struct {
 
 func (x *PositionKey) Reset() {
 	*x = PositionKey{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[19]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1273,7 +1405,7 @@ func (x *PositionKey) String() string {
 func (*PositionKey) ProtoMessage() {}
 
 func (x *PositionKey) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[19]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1286,7 +1418,7 @@ func (x *PositionKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionKey.ProtoReflect.Descriptor instead.
 func (*PositionKey) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{19}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PositionKey) GetProductId() string {
@@ -1317,7 +1449,7 @@ type Position struct {
 
 func (x *Position) Reset() {
 	*x = Position{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[20]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1329,7 +1461,7 @@ func (x *Position) String() string {
 func (*Position) ProtoMessage() {}
 
 func (x *Position) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[20]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1342,7 +1474,7 @@ func (x *Position) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Position.ProtoReflect.Descriptor instead.
 func (*Position) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{20}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Position) GetProductId() string {
@@ -1396,7 +1528,7 @@ type PositionsRequest struct {
 
 func (x *PositionsRequest) Reset() {
 	*x = PositionsRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[21]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1408,7 +1540,7 @@ func (x *PositionsRequest) String() string {
 func (*PositionsRequest) ProtoMessage() {}
 
 func (x *PositionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[21]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1421,7 +1553,7 @@ func (x *PositionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionsRequest.ProtoReflect.Descriptor instead.
 func (*PositionsRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{21}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *PositionsRequest) GetKeys() []*PositionKey {
@@ -1441,7 +1573,7 @@ type PositionsResponse struct {
 
 func (x *PositionsResponse) Reset() {
 	*x = PositionsResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[22]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1453,7 +1585,7 @@ func (x *PositionsResponse) String() string {
 func (*PositionsResponse) ProtoMessage() {}
 
 func (x *PositionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[22]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1466,7 +1598,7 @@ func (x *PositionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PositionsResponse.ProtoReflect.Descriptor instead.
 func (*PositionsResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{22}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PositionsResponse) GetPositions() []*Position {
@@ -1493,7 +1625,7 @@ type ReceiveLine struct {
 
 func (x *ReceiveLine) Reset() {
 	*x = ReceiveLine{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1505,7 +1637,7 @@ func (x *ReceiveLine) String() string {
 func (*ReceiveLine) ProtoMessage() {}
 
 func (x *ReceiveLine) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[23]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1518,7 +1650,7 @@ func (x *ReceiveLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReceiveLine.ProtoReflect.Descriptor instead.
 func (*ReceiveLine) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{23}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReceiveLine) GetLineId() string {
@@ -1573,7 +1705,7 @@ type ReceiveRequest struct {
 
 func (x *ReceiveRequest) Reset() {
 	*x = ReceiveRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1585,7 +1717,7 @@ func (x *ReceiveRequest) String() string {
 func (*ReceiveRequest) ProtoMessage() {}
 
 func (x *ReceiveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[24]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1598,7 +1730,7 @@ func (x *ReceiveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReceiveRequest.ProtoReflect.Descriptor instead.
 func (*ReceiveRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{24}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ReceiveRequest) GetReceiptId() string {
@@ -1654,7 +1786,7 @@ type ReceiveResponse struct {
 
 func (x *ReceiveResponse) Reset() {
 	*x = ReceiveResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1666,7 +1798,7 @@ func (x *ReceiveResponse) String() string {
 func (*ReceiveResponse) ProtoMessage() {}
 
 func (x *ReceiveResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[25]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1679,7 +1811,7 @@ func (x *ReceiveResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReceiveResponse.ProtoReflect.Descriptor instead.
 func (*ReceiveResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{25}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ReceiveResponse) GetReceiptId() string {
@@ -1717,7 +1849,7 @@ type ReturnRequest struct {
 
 func (x *ReturnRequest) Reset() {
 	*x = ReturnRequest{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1729,7 +1861,7 @@ func (x *ReturnRequest) String() string {
 func (*ReturnRequest) ProtoMessage() {}
 
 func (x *ReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[26]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1742,7 +1874,7 @@ func (x *ReturnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnRequest.ProtoReflect.Descriptor instead.
 func (*ReturnRequest) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{26}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ReturnRequest) GetReturnId() string {
@@ -1804,7 +1936,7 @@ type ReturnResponse struct {
 
 func (x *ReturnResponse) Reset() {
 	*x = ReturnResponse{}
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1816,7 +1948,7 @@ func (x *ReturnResponse) String() string {
 func (*ReturnResponse) ProtoMessage() {}
 
 func (x *ReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[27]
+	mi := &file_be_erp_inventory_v3_inventory_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1829,7 +1961,7 @@ func (x *ReturnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnResponse.ProtoReflect.Descriptor instead.
 func (*ReturnResponse) Descriptor() ([]byte, []int) {
-	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{27}
+	return file_be_erp_inventory_v3_inventory_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ReturnResponse) GetReturnId() string {
@@ -1850,7 +1982,17 @@ var File_be_erp_inventory_v3_inventory_proto protoreflect.FileDescriptor
 
 const file_be_erp_inventory_v3_inventory_proto_rawDesc = "" +
 	"\n" +
-	"#be/erp/inventory/v3/inventory.proto\x12\x13be.erp.inventory.v3\"K\n" +
+	"#be/erp/inventory/v3/inventory.proto\x12\x13be.erp.inventory.v3\"\xb3\x01\n" +
+	"\x10MovementsRequest\x12&\n" +
+	"\x0flegal_entity_id\x18\x01 \x01(\tR\rlegalEntityId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\tR\tproductId\x12'\n" +
+	"\x0fvaluation_epoch\x18\x03 \x01(\tR\x0evaluationEpoch\x12\x19\n" +
+	"\bfrom_seq\x18\x04 \x01(\x03R\afromSeq\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\x05R\x05limit\"L\n" +
+	"\x11MovementsResponse\x12\x1c\n" +
+	"\tmovements\x18\x01 \x03(\fR\tmovements\x12\x19\n" +
+	"\blast_seq\x18\x02 \x01(\x03R\alastSeq\"K\n" +
 	"\tReference\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x1a\n" +
@@ -1993,12 +2135,13 @@ const file_be_erp_inventory_v3_inventory_proto_rawDesc = "" +
 	"\aConfirm\x12#.be.erp.inventory.v3.ConfirmRequest\x1a$.be.erp.inventory.v3.ConfirmResponse\x12Q\n" +
 	"\x06Cancel\x12\".be.erp.inventory.v3.CancelRequest\x1a#.be.erp.inventory.v3.CancelResponse\x12N\n" +
 	"\x05Query\x12!.be.erp.inventory.v3.QueryRequest\x1a\".be.erp.inventory.v3.QueryResponse\x12Q\n" +
-	"\x06Adjust\x12\".be.erp.inventory.v3.AdjustRequest\x1a#.be.erp.inventory.v3.AdjustResponse2\xe3\x02\n" +
+	"\x06Adjust\x12\".be.erp.inventory.v3.AdjustRequest\x1a#.be.erp.inventory.v3.AdjustResponse2\xbf\x03\n" +
 	"\fStockService\x12N\n" +
 	"\x05Issue\x12!.be.erp.inventory.v3.IssueRequest\x1a\".be.erp.inventory.v3.IssueResponse\x12Z\n" +
 	"\tPositions\x12%.be.erp.inventory.v3.PositionsRequest\x1a&.be.erp.inventory.v3.PositionsResponse\x12T\n" +
 	"\aReceive\x12#.be.erp.inventory.v3.ReceiveRequest\x1a$.be.erp.inventory.v3.ReceiveResponse\x12Q\n" +
-	"\x06Return\x12\".be.erp.inventory.v3.ReturnRequest\x1a#.be.erp.inventory.v3.ReturnResponseBVZTgithub.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3;inventoryv3b\x06proto3"
+	"\x06Return\x12\".be.erp.inventory.v3.ReturnRequest\x1a#.be.erp.inventory.v3.ReturnResponse\x12Z\n" +
+	"\tMovements\x12%.be.erp.inventory.v3.MovementsRequest\x1a&.be.erp.inventory.v3.MovementsResponseBVZTgithub.com/brickKit/erp-inventory/contract/v3/gen/go/be/erp/inventory/v3;inventoryv3b\x06proto3"
 
 var (
 	file_be_erp_inventory_v3_inventory_proto_rawDescOnce sync.Once
@@ -2013,79 +2156,83 @@ func file_be_erp_inventory_v3_inventory_proto_rawDescGZIP() []byte {
 }
 
 var file_be_erp_inventory_v3_inventory_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_be_erp_inventory_v3_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_be_erp_inventory_v3_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_be_erp_inventory_v3_inventory_proto_goTypes = []any{
 	(BranchState)(0),          // 0: be.erp.inventory.v3.BranchState
-	(*Reference)(nil),         // 1: be.erp.inventory.v3.Reference
-	(*HoldLine)(nil),          // 2: be.erp.inventory.v3.HoldLine
-	(*HoldRequest)(nil),       // 3: be.erp.inventory.v3.HoldRequest
-	(*ConfirmRequest)(nil),    // 4: be.erp.inventory.v3.ConfirmRequest
-	(*CancelRequest)(nil),     // 5: be.erp.inventory.v3.CancelRequest
-	(*QueryRequest)(nil),      // 6: be.erp.inventory.v3.QueryRequest
-	(*AdjustRequest)(nil),     // 7: be.erp.inventory.v3.AdjustRequest
-	(*BranchLine)(nil),        // 8: be.erp.inventory.v3.BranchLine
-	(*Shortage)(nil),          // 9: be.erp.inventory.v3.Shortage
-	(*Branch)(nil),            // 10: be.erp.inventory.v3.Branch
-	(*HoldResponse)(nil),      // 11: be.erp.inventory.v3.HoldResponse
-	(*ConfirmResponse)(nil),   // 12: be.erp.inventory.v3.ConfirmResponse
-	(*CancelResponse)(nil),    // 13: be.erp.inventory.v3.CancelResponse
-	(*QueryResponse)(nil),     // 14: be.erp.inventory.v3.QueryResponse
-	(*AdjustResponse)(nil),    // 15: be.erp.inventory.v3.AdjustResponse
-	(*IssueLine)(nil),         // 16: be.erp.inventory.v3.IssueLine
-	(*IssueRequest)(nil),      // 17: be.erp.inventory.v3.IssueRequest
-	(*IssueProblem)(nil),      // 18: be.erp.inventory.v3.IssueProblem
-	(*IssueResponse)(nil),     // 19: be.erp.inventory.v3.IssueResponse
-	(*PositionKey)(nil),       // 20: be.erp.inventory.v3.PositionKey
-	(*Position)(nil),          // 21: be.erp.inventory.v3.Position
-	(*PositionsRequest)(nil),  // 22: be.erp.inventory.v3.PositionsRequest
-	(*PositionsResponse)(nil), // 23: be.erp.inventory.v3.PositionsResponse
-	(*ReceiveLine)(nil),       // 24: be.erp.inventory.v3.ReceiveLine
-	(*ReceiveRequest)(nil),    // 25: be.erp.inventory.v3.ReceiveRequest
-	(*ReceiveResponse)(nil),   // 26: be.erp.inventory.v3.ReceiveResponse
-	(*ReturnRequest)(nil),     // 27: be.erp.inventory.v3.ReturnRequest
-	(*ReturnResponse)(nil),    // 28: be.erp.inventory.v3.ReturnResponse
+	(*MovementsRequest)(nil),  // 1: be.erp.inventory.v3.MovementsRequest
+	(*MovementsResponse)(nil), // 2: be.erp.inventory.v3.MovementsResponse
+	(*Reference)(nil),         // 3: be.erp.inventory.v3.Reference
+	(*HoldLine)(nil),          // 4: be.erp.inventory.v3.HoldLine
+	(*HoldRequest)(nil),       // 5: be.erp.inventory.v3.HoldRequest
+	(*ConfirmRequest)(nil),    // 6: be.erp.inventory.v3.ConfirmRequest
+	(*CancelRequest)(nil),     // 7: be.erp.inventory.v3.CancelRequest
+	(*QueryRequest)(nil),      // 8: be.erp.inventory.v3.QueryRequest
+	(*AdjustRequest)(nil),     // 9: be.erp.inventory.v3.AdjustRequest
+	(*BranchLine)(nil),        // 10: be.erp.inventory.v3.BranchLine
+	(*Shortage)(nil),          // 11: be.erp.inventory.v3.Shortage
+	(*Branch)(nil),            // 12: be.erp.inventory.v3.Branch
+	(*HoldResponse)(nil),      // 13: be.erp.inventory.v3.HoldResponse
+	(*ConfirmResponse)(nil),   // 14: be.erp.inventory.v3.ConfirmResponse
+	(*CancelResponse)(nil),    // 15: be.erp.inventory.v3.CancelResponse
+	(*QueryResponse)(nil),     // 16: be.erp.inventory.v3.QueryResponse
+	(*AdjustResponse)(nil),    // 17: be.erp.inventory.v3.AdjustResponse
+	(*IssueLine)(nil),         // 18: be.erp.inventory.v3.IssueLine
+	(*IssueRequest)(nil),      // 19: be.erp.inventory.v3.IssueRequest
+	(*IssueProblem)(nil),      // 20: be.erp.inventory.v3.IssueProblem
+	(*IssueResponse)(nil),     // 21: be.erp.inventory.v3.IssueResponse
+	(*PositionKey)(nil),       // 22: be.erp.inventory.v3.PositionKey
+	(*Position)(nil),          // 23: be.erp.inventory.v3.Position
+	(*PositionsRequest)(nil),  // 24: be.erp.inventory.v3.PositionsRequest
+	(*PositionsResponse)(nil), // 25: be.erp.inventory.v3.PositionsResponse
+	(*ReceiveLine)(nil),       // 26: be.erp.inventory.v3.ReceiveLine
+	(*ReceiveRequest)(nil),    // 27: be.erp.inventory.v3.ReceiveRequest
+	(*ReceiveResponse)(nil),   // 28: be.erp.inventory.v3.ReceiveResponse
+	(*ReturnRequest)(nil),     // 29: be.erp.inventory.v3.ReturnRequest
+	(*ReturnResponse)(nil),    // 30: be.erp.inventory.v3.ReturnResponse
 }
 var file_be_erp_inventory_v3_inventory_proto_depIdxs = []int32{
-	1,  // 0: be.erp.inventory.v3.HoldRequest.reference:type_name -> be.erp.inventory.v3.Reference
-	2,  // 1: be.erp.inventory.v3.HoldRequest.lines:type_name -> be.erp.inventory.v3.HoldLine
-	2,  // 2: be.erp.inventory.v3.AdjustRequest.lines:type_name -> be.erp.inventory.v3.HoldLine
+	3,  // 0: be.erp.inventory.v3.HoldRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	4,  // 1: be.erp.inventory.v3.HoldRequest.lines:type_name -> be.erp.inventory.v3.HoldLine
+	4,  // 2: be.erp.inventory.v3.AdjustRequest.lines:type_name -> be.erp.inventory.v3.HoldLine
 	0,  // 3: be.erp.inventory.v3.Branch.state:type_name -> be.erp.inventory.v3.BranchState
-	9,  // 4: be.erp.inventory.v3.Branch.shortages:type_name -> be.erp.inventory.v3.Shortage
-	8,  // 5: be.erp.inventory.v3.Branch.lines:type_name -> be.erp.inventory.v3.BranchLine
-	10, // 6: be.erp.inventory.v3.HoldResponse.branch:type_name -> be.erp.inventory.v3.Branch
-	10, // 7: be.erp.inventory.v3.ConfirmResponse.branch:type_name -> be.erp.inventory.v3.Branch
-	10, // 8: be.erp.inventory.v3.CancelResponse.branch:type_name -> be.erp.inventory.v3.Branch
-	10, // 9: be.erp.inventory.v3.QueryResponse.branch:type_name -> be.erp.inventory.v3.Branch
-	10, // 10: be.erp.inventory.v3.AdjustResponse.branch:type_name -> be.erp.inventory.v3.Branch
-	1,  // 11: be.erp.inventory.v3.IssueRequest.reference:type_name -> be.erp.inventory.v3.Reference
-	16, // 12: be.erp.inventory.v3.IssueRequest.lines:type_name -> be.erp.inventory.v3.IssueLine
+	11, // 4: be.erp.inventory.v3.Branch.shortages:type_name -> be.erp.inventory.v3.Shortage
+	10, // 5: be.erp.inventory.v3.Branch.lines:type_name -> be.erp.inventory.v3.BranchLine
+	12, // 6: be.erp.inventory.v3.HoldResponse.branch:type_name -> be.erp.inventory.v3.Branch
+	12, // 7: be.erp.inventory.v3.ConfirmResponse.branch:type_name -> be.erp.inventory.v3.Branch
+	12, // 8: be.erp.inventory.v3.CancelResponse.branch:type_name -> be.erp.inventory.v3.Branch
+	12, // 9: be.erp.inventory.v3.QueryResponse.branch:type_name -> be.erp.inventory.v3.Branch
+	12, // 10: be.erp.inventory.v3.AdjustResponse.branch:type_name -> be.erp.inventory.v3.Branch
+	3,  // 11: be.erp.inventory.v3.IssueRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	18, // 12: be.erp.inventory.v3.IssueRequest.lines:type_name -> be.erp.inventory.v3.IssueLine
 	0,  // 13: be.erp.inventory.v3.IssueResponse.branch_state:type_name -> be.erp.inventory.v3.BranchState
-	18, // 14: be.erp.inventory.v3.IssueResponse.problems:type_name -> be.erp.inventory.v3.IssueProblem
-	20, // 15: be.erp.inventory.v3.PositionsRequest.keys:type_name -> be.erp.inventory.v3.PositionKey
-	21, // 16: be.erp.inventory.v3.PositionsResponse.positions:type_name -> be.erp.inventory.v3.Position
-	1,  // 17: be.erp.inventory.v3.ReceiveRequest.reference:type_name -> be.erp.inventory.v3.Reference
-	24, // 18: be.erp.inventory.v3.ReceiveRequest.lines:type_name -> be.erp.inventory.v3.ReceiveLine
-	1,  // 19: be.erp.inventory.v3.ReturnRequest.reference:type_name -> be.erp.inventory.v3.Reference
-	3,  // 20: be.erp.inventory.v3.ReservationService.Hold:input_type -> be.erp.inventory.v3.HoldRequest
-	4,  // 21: be.erp.inventory.v3.ReservationService.Confirm:input_type -> be.erp.inventory.v3.ConfirmRequest
-	5,  // 22: be.erp.inventory.v3.ReservationService.Cancel:input_type -> be.erp.inventory.v3.CancelRequest
-	6,  // 23: be.erp.inventory.v3.ReservationService.Query:input_type -> be.erp.inventory.v3.QueryRequest
-	7,  // 24: be.erp.inventory.v3.ReservationService.Adjust:input_type -> be.erp.inventory.v3.AdjustRequest
-	17, // 25: be.erp.inventory.v3.StockService.Issue:input_type -> be.erp.inventory.v3.IssueRequest
-	22, // 26: be.erp.inventory.v3.StockService.Positions:input_type -> be.erp.inventory.v3.PositionsRequest
-	25, // 27: be.erp.inventory.v3.StockService.Receive:input_type -> be.erp.inventory.v3.ReceiveRequest
-	27, // 28: be.erp.inventory.v3.StockService.Return:input_type -> be.erp.inventory.v3.ReturnRequest
-	11, // 29: be.erp.inventory.v3.ReservationService.Hold:output_type -> be.erp.inventory.v3.HoldResponse
-	12, // 30: be.erp.inventory.v3.ReservationService.Confirm:output_type -> be.erp.inventory.v3.ConfirmResponse
-	13, // 31: be.erp.inventory.v3.ReservationService.Cancel:output_type -> be.erp.inventory.v3.CancelResponse
-	14, // 32: be.erp.inventory.v3.ReservationService.Query:output_type -> be.erp.inventory.v3.QueryResponse
-	15, // 33: be.erp.inventory.v3.ReservationService.Adjust:output_type -> be.erp.inventory.v3.AdjustResponse
-	19, // 34: be.erp.inventory.v3.StockService.Issue:output_type -> be.erp.inventory.v3.IssueResponse
-	23, // 35: be.erp.inventory.v3.StockService.Positions:output_type -> be.erp.inventory.v3.PositionsResponse
-	26, // 36: be.erp.inventory.v3.StockService.Receive:output_type -> be.erp.inventory.v3.ReceiveResponse
-	28, // 37: be.erp.inventory.v3.StockService.Return:output_type -> be.erp.inventory.v3.ReturnResponse
-	29, // [29:38] is the sub-list for method output_type
-	20, // [20:29] is the sub-list for method input_type
+	20, // 14: be.erp.inventory.v3.IssueResponse.problems:type_name -> be.erp.inventory.v3.IssueProblem
+	22, // 15: be.erp.inventory.v3.PositionsRequest.keys:type_name -> be.erp.inventory.v3.PositionKey
+	23, // 16: be.erp.inventory.v3.PositionsResponse.positions:type_name -> be.erp.inventory.v3.Position
+	3,  // 17: be.erp.inventory.v3.ReceiveRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	26, // 18: be.erp.inventory.v3.ReceiveRequest.lines:type_name -> be.erp.inventory.v3.ReceiveLine
+	3,  // 19: be.erp.inventory.v3.ReturnRequest.reference:type_name -> be.erp.inventory.v3.Reference
+	5,  // 20: be.erp.inventory.v3.ReservationService.Hold:input_type -> be.erp.inventory.v3.HoldRequest
+	6,  // 21: be.erp.inventory.v3.ReservationService.Confirm:input_type -> be.erp.inventory.v3.ConfirmRequest
+	7,  // 22: be.erp.inventory.v3.ReservationService.Cancel:input_type -> be.erp.inventory.v3.CancelRequest
+	8,  // 23: be.erp.inventory.v3.ReservationService.Query:input_type -> be.erp.inventory.v3.QueryRequest
+	9,  // 24: be.erp.inventory.v3.ReservationService.Adjust:input_type -> be.erp.inventory.v3.AdjustRequest
+	19, // 25: be.erp.inventory.v3.StockService.Issue:input_type -> be.erp.inventory.v3.IssueRequest
+	24, // 26: be.erp.inventory.v3.StockService.Positions:input_type -> be.erp.inventory.v3.PositionsRequest
+	27, // 27: be.erp.inventory.v3.StockService.Receive:input_type -> be.erp.inventory.v3.ReceiveRequest
+	29, // 28: be.erp.inventory.v3.StockService.Return:input_type -> be.erp.inventory.v3.ReturnRequest
+	1,  // 29: be.erp.inventory.v3.StockService.Movements:input_type -> be.erp.inventory.v3.MovementsRequest
+	13, // 30: be.erp.inventory.v3.ReservationService.Hold:output_type -> be.erp.inventory.v3.HoldResponse
+	14, // 31: be.erp.inventory.v3.ReservationService.Confirm:output_type -> be.erp.inventory.v3.ConfirmResponse
+	15, // 32: be.erp.inventory.v3.ReservationService.Cancel:output_type -> be.erp.inventory.v3.CancelResponse
+	16, // 33: be.erp.inventory.v3.ReservationService.Query:output_type -> be.erp.inventory.v3.QueryResponse
+	17, // 34: be.erp.inventory.v3.ReservationService.Adjust:output_type -> be.erp.inventory.v3.AdjustResponse
+	21, // 35: be.erp.inventory.v3.StockService.Issue:output_type -> be.erp.inventory.v3.IssueResponse
+	25, // 36: be.erp.inventory.v3.StockService.Positions:output_type -> be.erp.inventory.v3.PositionsResponse
+	28, // 37: be.erp.inventory.v3.StockService.Receive:output_type -> be.erp.inventory.v3.ReceiveResponse
+	30, // 38: be.erp.inventory.v3.StockService.Return:output_type -> be.erp.inventory.v3.ReturnResponse
+	2,  // 39: be.erp.inventory.v3.StockService.Movements:output_type -> be.erp.inventory.v3.MovementsResponse
+	30, // [30:40] is the sub-list for method output_type
+	20, // [20:30] is the sub-list for method input_type
 	20, // [20:20] is the sub-list for extension type_name
 	20, // [20:20] is the sub-list for extension extendee
 	0,  // [0:20] is the sub-list for field type_name
@@ -2102,7 +2249,7 @@ func file_be_erp_inventory_v3_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_be_erp_inventory_v3_inventory_proto_rawDesc), len(file_be_erp_inventory_v3_inventory_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

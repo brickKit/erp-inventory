@@ -40,6 +40,27 @@ service StockService {
   // component only): idempotent by return_id; at most what the original received and has not returned, within what
   // is available.
   rpc Return(ReturnRequest) returns (ReturnResponse);
+  // Movements reads one legal entity's movements of one product by their valuation sequence (alpha.3; the costing
+  // component only): those numbered in the epoch from from_seq on, in their order, at most limit (0: 200, at most
+  // 1000); a consumer that finds a gap reads it back here (protocol 05b, "计算与缺口").
+  rpc Movements(MovementsRequest) returns (MovementsResponse);
+}
+
+message MovementsRequest {
+  string legal_entity_id = 1;
+  string product_id = 2;
+  // the valuation sequence's epoch (a full recovery starts a new one)
+  string valuation_epoch = 3;
+  // the first valuation sequence number wanted
+  int64 from_seq = 4;
+  int32 limit = 5;
+}
+
+message MovementsResponse {
+  // each the payload of erp.inventory_movement.recorded.v1 (JSON), by valuation sequence
+  repeated bytes movements = 1;
+  // the highest valuation sequence numbered in the epoch for the pair (0: none)
+  int64 last_seq = 2;
 }
 
 enum BranchState {
