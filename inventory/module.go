@@ -64,7 +64,8 @@ func (m *Module) Services(s *grpcx.Services) error {
 		"Issue":     {Operation: core.OpSysIssue, Callers: []string{core.Sales}},
 		"Receive":   {Operation: core.OpSysReceive, Callers: []string{core.Purchase}},
 		"Return":    {Operation: core.OpSysReceive, Callers: []string{core.Purchase}},
-		"Positions": {Operation: core.OpSysRead, Callers: []string{grpcx.AnyComponent}}})
+		"Positions": {Operation: core.OpSysRead, Callers: []string{grpcx.AnyComponent}},
+		"Movements": {Operation: core.OpSysRead, Callers: []string{core.Costing}}})
 	return nil
 }
 

@@ -13,6 +13,7 @@
 | --- | --- |
 | `movements.go` | `receiptLine`、`CheckTracking`、`Receive`、`writeReceipt`（手工入库与采购收货共用）、`movements`、`GetMovement`；列表 `movementList`、`ListMovements` |
 | `purchase.go` | `ReceivePurchase`、`ReturnPurchase`、`claim`（调用身份与内容摘要）、`originOf`、`returnSerials` |
+| `valuation.go` | `ByValuation`：`StockService.Movements`，成本组件按计价序号补取流水（协议 05b 的缺口），按序回答、带这一对的最大序号 |
 
 ## 依赖与被依赖
 

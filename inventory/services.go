@@ -55,3 +55,8 @@ func (m *Module) Receive(ctx context.Context, in *inventoryv3.ReceiveRequest) (*
 func (m *Module) Return(ctx context.Context, in *inventoryv3.ReturnRequest) (*inventoryv3.ReturnResponse, error) {
 	return movements.ReturnPurchase(m.b, ctx, in)
 }
+
+// Movements is the costing component's read by valuation sequence (the movements module).
+func (m *Module) Movements(ctx context.Context, in *inventoryv3.MovementsRequest) (*inventoryv3.MovementsResponse, error) {
+	return movements.ByValuation(m.b, ctx, in)
+}

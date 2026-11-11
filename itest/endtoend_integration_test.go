@@ -151,6 +151,7 @@ func TestInventoryEndToEnd(t *testing.T) {
 	fx.issue()
 	fx.serialIssue()
 	fx.numbering()
+	fx.valuationRead()
 	fx.purchases()
 	fx.dimensions()
 	fx.recoveryChecks()

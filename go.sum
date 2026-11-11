@@ -48,6 +48,8 @@ github.com/brickKit/contract-infra-authz/v3 v3.0.0-alpha.6 h1:9Ju2Lp3HXFCc3FSF5o
 github.com/brickKit/contract-infra-authz/v3 v3.0.0-alpha.6/go.mod h1:21N0lZKoL1STxtsx5Yi9Wh8cJ32gtsQuVF52oxMWaps=
 github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.2 h1:jhwwfWYna1lOqoem9tk7MhTfm9GBUO+9LIVdT/6lHAI=
 github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.2/go.mod h1:QAppFYsuFc6Jd2EI+yn4O+534dIf/4k7GnVq2MKibc8=
+github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.3 h1:MXpM6Z4IFYUuHzw+afK4/PrAjisTNhkNijAl5J5Un9M=
+github.com/brickKit/erp-inventory/contract/v3 v3.0.0-alpha.3/go.mod h1:QAppFYsuFc6Jd2EI+yn4O+534dIf/4k7GnVq2MKibc8=
 github.com/brickKit/infra-audit/contract/v3 v3.0.0-alpha.2 h1:0snoszyg1imd9WGsK7I2H0lGNM6CKDOoE06D2jn/4G4=
 github.com/brickKit/infra-audit/contract/v3 v3.0.0-alpha.2/go.mod h1:lNvJIGkwHYJd9bv/ngYiKal65x7/M7McyHOzCIKyTSQ=
 github.com/brickKit/mdm-org/contract/v3 v3.0.0-alpha.1 h1:gDJ/m+JFealROMUcXxEVsbZxT5gUDXb//+F9ZeXoKas=

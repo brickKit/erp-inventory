@@ -42,7 +42,7 @@
 
 - **系统面**（本仓库 `contract/proto`，模块 `github.com/brickKit/erp-inventory/contract/v3`，标签 `contract/v3.…`）：
   - `be.erp.inventory.v3.ReservationService/Hold`、`Confirm`、`Cancel`、`Query`（`Adjust` 本版不支持）：只对 `erp/sales` 开放，操作 `erp.inventory.system.reserve`。
-  - `be.erp.inventory.v3.StockService/Issue`：只对 `erp/sales` 开放，操作 `erp.inventory.system.issue`；`Positions`：任一组件，操作 `erp.inventory.system.read`；`Receive`（采购收货，按 `receipt_id` 幂等，流水带收货行参考）与 `Return`（采购退货，引用原入库流水，至多它没退的部分）：只对 `erp/purchase` 开放，操作 `erp.inventory.system.receive`（3.0.37 起，契约 alpha.2）。
+  - `be.erp.inventory.v3.StockService/Issue`：只对 `erp/sales` 开放，操作 `erp.inventory.system.issue`；`Positions`：任一组件，操作 `erp.inventory.system.read`；`Receive`（采购收货，按 `receipt_id` 幂等，流水带收货行参考）与 `Return`（采购退货，引用原入库流水，至多它没退的部分）：只对 `erp/purchase` 开放，操作 `erp.inventory.system.receive`（3.0.37 起，契约 alpha.2）；`Movements`（按“法人 + 产品”的计价纪元与序号读流水，给成本组件补缺口，每次至多 1000 条，带这一对编到的最大序号）：只对 `erp/costing` 开放，操作 `erp.inventory.system.read`（3.0.39 起，契约 alpha.3）。
 - **用户面**：`contract/openapi.yaml`。操作 `erp.inventory.warehouse.read`、`erp.inventory.warehouse.manage`、`erp.inventory.stock.read`、`erp.inventory.movement.read`、`erp.inventory.movement.create`（`erp.inventory.adjustment.create` 本版不支持）；资源带法人与仓库两个维度（“库管只看一个仓库”）。
 - **事件**（流 `erp.inventory`，schema 在 `contract/events/`）：`erp.warehouse.changed.v1`、`erp.stock_position.changed.v1`、`erp.inventory_branch.changed.v1`（完整状态），`erp.inventory_movement.recorded.v1`（增量事实，按 `fact_id` 去重）。
 

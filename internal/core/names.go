@@ -17,6 +17,8 @@ const (
 	Sales = "erp/sales"
 	// Purchase is the component allowed to receive purchases and return them (3.0.37).
 	Purchase = "erp/purchase"
+	// Costing reads the movements by valuation sequence (StockService.Movements, protocol 05b).
+	Costing = "erp/costing"
 )
 
 // The stream and its event types (contract/events).
