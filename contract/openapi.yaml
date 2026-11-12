@@ -260,7 +260,7 @@ paths:
   /api/inventory/adjustments:
     post:
       operationId: adjust
-      x-operation: erp.inventory.adjustment.create
+      x-operation: erp.inventory.movement.adjust
       summary: Adjust stock after a count, with approval or permission (not in this version, CAPABILITY_UNSUPPORTED)
       parameters:
         - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}

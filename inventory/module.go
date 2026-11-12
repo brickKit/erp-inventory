@@ -47,7 +47,7 @@ func (m *Module) Routes(r *httpx.Routes) error {
 	add("GET", "/api/inventory/branches/:id", core.OpStockRead, h(branches.GetBranchHTTP))
 	// in the contract, not in this version (D75)
 	add("POST", "/api/inventory/transfers", core.OpMoveCreate, core.Unsupported)
-	add("POST", "/api/inventory/adjustments", core.OpAdjustCreate, core.Unsupported)
+	add("POST", "/api/inventory/adjustments", core.OpMoveAdjust, core.Unsupported)
 	return nil
 }
 

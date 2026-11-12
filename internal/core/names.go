@@ -32,16 +32,19 @@ const (
 
 // Resources and operations (contract/openapi.yaml names each route's operation).
 const (
-	Warehouses     = "erp.inventory.warehouse"
-	OpWhRead       = "erp.inventory.warehouse.read"
-	OpWhManage     = "erp.inventory.warehouse.manage"
-	Stock          = "erp.inventory.stock"
-	OpStockRead    = "erp.inventory.stock.read"
-	Movements      = "erp.inventory.movement"
-	OpMoveRead     = "erp.inventory.movement.read"
-	OpMoveCreate   = "erp.inventory.movement.create"
-	OpAdjustCreate = "erp.inventory.adjustment.create"
-	System         = "erp.inventory.system"
+	Warehouses   = "erp.inventory.warehouse"
+	OpWhRead     = "erp.inventory.warehouse.read"
+	OpWhManage   = "erp.inventory.warehouse.manage"
+	Stock        = "erp.inventory.stock"
+	OpStockRead  = "erp.inventory.stock.read"
+	Movements    = "erp.inventory.movement"
+	OpMoveRead   = "erp.inventory.movement.read"
+	OpMoveCreate = "erp.inventory.movement.create"
+	// OpMoveAdjust is an adjustment (a movement of kind adjustment, needing approval or this operation; not in this
+	// version). It replaces erp.inventory.adjustment.create (retired in 3.0.43: never usable, and not the resource
+	// type and one action, be-protocol P8.7).
+	OpMoveAdjust = "erp.inventory.movement.adjust"
+	System       = "erp.inventory.system"
 	// OpResend is the redelivery of this component's stream (be-protocol P6.38: every component with streams serves
 	// it; any component of the deployment may call it).
 	OpResend = "erp.inventory.system.resend"
@@ -106,7 +109,7 @@ func Definitions() *sdkauthz.Definitions {
 			{Key: OpStockRead, ResourceType: Stock, Purpose: "read", RiskClass: "low"},
 			{Key: OpMoveRead, ResourceType: Movements, Purpose: "read", RiskClass: "low"},
 			{Key: OpMoveCreate, ResourceType: Movements, Purpose: "create", RiskClass: "low", SideEffects: []string{"business_write"}, Audit: true},
-			{Key: OpAdjustCreate, ResourceType: Movements, Purpose: "create", RiskClass: "high", SideEffects: []string{"business_write"}, Audit: true},
+			{Key: OpMoveAdjust, ResourceType: Movements, Purpose: "create", RiskClass: "high", SideEffects: []string{"business_write"}, Audit: true},
 			{Key: OpSysRead, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpResend, ResourceType: System, Purpose: "read", RiskClass: "low"},
 			{Key: OpRecover, ResourceType: System, Purpose: "read", RiskClass: "low"},

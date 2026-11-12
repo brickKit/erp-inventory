@@ -74,7 +74,7 @@
 | 仓库的维护与读取 | 用户面 | `erp.inventory.warehouse` 的 `erp.inventory.warehouse.manage`、`erp.inventory.warehouse.read` |
 | 分支的调整（订单修订，协议 04） | 系统面 `ReservationService` | 以后 |
 | 序号高点的读取与按序号补取（协议 06） | 系统面，只对成本组件开放 | 以后 |
-| 调拨；调整（需审批或权限）；盘点 | 用户面 | 以后（契约已有调拨与调整的路径：`erp.inventory.movement.create`、`erp.inventory.adjustment.create`） |
+| 调拨；调整（需审批或权限）；盘点 | 用户面 | 以后（契约已有调拨与调整的路径：`erp.inventory.movement.create`、`erp.inventory.movement.adjust`；调整原来的键 `erp.inventory.adjustment.create` 不是“资源类型 + 一段动作”，从没可用过，3.0.43 退役） |
 | 期初流水与已确认期初订单的期初分支（上线窗口，协议 16） | 系统面 | 以后 |
 
 用户面的资源带两个维度：法人（值集合，按仓库所属的法人）与仓库（值集合），支持“库管只看一个仓库”（安全 07）。确切的路径、字段与错误在 `contract/openapi.yaml` 与 `contract/proto/`；旧注册表里 2.x 的键（`erp.inventory.view` 等）随注册表的重新汇总退役。
@@ -103,11 +103,13 @@
 
 ## 实现状态
 
-3.0.42：{version}：be-sdk-go alpha.126（全系统同一个 SDK 版本；流程内核在员工投影变化后立即重新解析暂停的任务，没有员工目录时岗位任务答 NOT_QUALIFIED，装配项目阶段计划 C7 的 P7）及随之连锁的版本；本组件行为不变。
+3.0.43：调整的操作键改为 `erp.inventory.movement.adjust`（调整是流水的一种类型）；原来的 `erp.inventory.adjustment.create` 不是“资源类型 + 一段动作”（线协议 P8.7，be-protocol alpha.123 起启动时拒绝），从没可用过，退役。调整本版仍不支持。
 
-3.0.41：{version}：be-sdk-go alpha.125（全系统同一个 SDK 版本；流程内核为采购与收付款的审批补的几样，装配项目阶段计划 C7 的 P4）及随之连锁的版本；本组件行为不变。
+3.0.42：be-sdk-go alpha.126（全系统同一个 SDK 版本；流程内核在员工投影变化后立即重新解析暂停的任务，没有员工目录时岗位任务答 NOT_QUALIFIED，装配项目阶段计划 C7 的 P7）及随之连锁的版本；本组件行为不变。
 
-3.0.40：{version}：be-sdk-go alpha.122（全系统同一个 SDK 版本；SDK 加了流程内核，线协议第 17 章，装配项目阶段计划 C7 的 P3）；行为不变。
+3.0.41：be-sdk-go alpha.125（全系统同一个 SDK 版本；流程内核为采购与收付款的审批补的几样，装配项目阶段计划 C7 的 P4）及随之连锁的版本；本组件行为不变。
+
+3.0.40：be-sdk-go alpha.122（全系统同一个 SDK 版本；SDK 加了流程内核，线协议第 17 章，装配项目阶段计划 C7 的 P3）；行为不变。
 
 3.0.39：系统面 `StockService.Movements`（契约 alpha.3）：成本组件按“法人 + 产品”的计价纪元与序号读流水，补它发现的缺口（协议 05b 的“计算与缺口”；装配项目阶段计划 C5 的 P0b）。
 
