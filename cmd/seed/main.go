@@ -161,7 +161,8 @@ func main() {
 	_, err = a.GrantRoles([]seed.RoleSpec{
 		{Key: "maintain", Name: prefix + "库存维护", To: []string{user}, Segments: append(reads(),
 			segment("erp.inventory.warehouse", "erp.inventory.warehouse.manage"),
-			segment("erp.inventory.movement", "erp.inventory.movement.create"))},
+			segment("erp.inventory.movement", "erp.inventory.movement.create"),
+			segment("erp.inventory.movement", "erp.inventory.movement.adjust"))},
 		{Key: "read-cn01", Name: prefix + "库存只读（CN01）", To: []string{"test.sales.cn", "test.sales.multi"}, Segments: reads(les["CN01"])},
 		{Key: "read-es01", Name: prefix + "库存只读（ES01）", To: []string{"test.sales.es"}, Segments: reads(les["ES01"])},
 	}, accounts)
